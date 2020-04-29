@@ -2,7 +2,10 @@ import { DocumentController, ScopeInfoAPI, Token } from './document';
 import fs from 'fs';
 import * as oniguruma from 'vscode-oniguruma-wasm';
 import { join } from 'path';
-import { ExtensionContext, Extension, extensions, Memento, Position, TextDocument, Uri, workspace } from 'vscode';
+import {
+  commands, Disposable, ExtensionContext, Extension, extensions, Hover, languages, Memento,
+  Position, TextDocument, Uri, workspace
+} from 'vscode';
 import { IGrammar, IRawGrammar, parseRawGrammar, Registry, RegistryOptions } from 'vscode-textmate';
 
 const documents = new Map<Uri, DocumentController>();
@@ -33,11 +36,11 @@ interface ExtensionPackage {
 
 function getLanguageScopeName(languageId: string): string {
   try {
-    const languages =
+    const extLanguages =
       extensions.all
         .filter(x => x.packageJSON && x.packageJSON.contributes && x.packageJSON.contributes.grammars)
         .reduce((a: ExtensionGrammar[], b) => [...a, ...(b.packageJSON as ExtensionPackage).contributes.grammars], []);
-    const matchingLanguages = languages.filter(g => g.language === languageId);
+    const matchingLanguages = extLanguages.filter(g => g.language === languageId);
 
     if (matchingLanguages.length > 0)
       return matchingLanguages[0].scopeName;
@@ -61,12 +64,12 @@ function groupGrammarsAndPath(grammars: ExtensionGrammar[], extension: Extension
 
 async function getLanguageGrammar(scopeName: string): Promise<IRawGrammar> {
   try {
-    const languages =
+    const extLanguages =
       extensions.all
         .filter(x => x.packageJSON && x.packageJSON.contributes && x.packageJSON.contributes.grammars)
         .reduce((a: GrammarAndExtensionPath[], b) => [...a,
         ...groupGrammarsAndPath((b.packageJSON as ExtensionPackage).contributes.grammars, b)], []);
-    const matchingLanguages = languages.filter(g => g.grammar.scopeName === scopeName);
+    const matchingLanguages = extLanguages.filter(g => g.grammar.scopeName === scopeName);
 
     if (matchingLanguages.length > 0) {
       const path = join(matchingLanguages[0].path, matchingLanguages[0].grammar.path);
@@ -89,13 +92,50 @@ const grammarLocator: RegistryOptions = {
   })
 };
 
+async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
+  const allLanguages =
+    (await languages.getLanguages())
+      .filter(x => getLanguageScopeName(x) !== undefined);
+
+  subscriptions.push(languages.registerHoverProvider(allLanguages, {
+    provideHover: (doc, pos): Hover => {
+      if (!isHoverEnabled())
+        return;
+
+      try {
+        const prettyDoc = documents.get(doc.uri);
+
+        if (prettyDoc) {
+          const token = prettyDoc.getScopeAt(pos);
+
+          if (token)
+            return {
+              contents: [`Token: \`${token.text}\``, `Category: \`${token.category}\``, ...token.scopes],
+              range: token.range
+            };
+        }
+      }
+      catch (err) { }
+
+      return undefined;
+    }
+  }));
+}
+
 export let workspaceState: Memento;
 
 export function activate(context: ExtensionContext): ScopeInfoAPI {
   workspaceState = context.workspaceState;
+
+  function registerCommand(commandId: string, run: (...args: any[]) => void): void {
+    context.subscriptions.push(commands.registerCommand(commandId, run));
+  }
+
+  registerCommand('extension.disableScopeHover', disableScopeHover);
+  registerCommand('extension.enableScopeHover', enableScopeHover);
   context.subscriptions.push(workspace.onDidOpenTextDocument(openDocument));
   context.subscriptions.push(workspace.onDidCloseTextDocument(closeDocument));
-
+  provideHoverInfo(context.subscriptions);
   reloadGrammar();
 
   return {
@@ -125,6 +165,16 @@ export function activate(context: ExtensionContext): ScopeInfoAPI {
   };
 }
 
+let hoverEnabled = false;
+
+export function isHoverEnabled(): boolean {
+  return hoverEnabled;
+}
+
+export function setHover(enabled: boolean): void {
+  hoverEnabled = enabled;
+}
+
 /** Re-read the settings and recreate substitutions for all documents */
 function reloadGrammar(): void {
   try {
@@ -141,6 +191,17 @@ function reloadGrammar(): void {
 
   for (const doc of workspace.textDocuments)
     openDocument(doc);
+}
+
+
+function disableScopeHover(): void {
+  setHover(false);
+  unloadDocuments();
+}
+
+function enableScopeHover(): void {
+  setHover(true);
+  reloadGrammar();
 }
 
 function loadGrammar(scopeName: string): Promise<IGrammar> {

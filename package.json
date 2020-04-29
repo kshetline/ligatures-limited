@@ -46,7 +46,19 @@
 			"type": "object",
 			"title": "LigaturesLimited",
 			"properties": {}
-		}
+		},
+		"commands": [
+			{
+				"command": "extension.enableScopeHover",
+				"title": "enable hover information",
+				"category": "ligatures-limited"
+			},
+			{
+				"command": "extension.disableScopeHover",
+				"title": "disable hover information",
+				"category": "ligatures-limited"
+			}
+		]
 	},
 	"dependencies": {
 		"ks-util": "^1.11.0",

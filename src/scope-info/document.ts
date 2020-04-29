@@ -1,38 +1,41 @@
-import vscode from 'vscode';
+import {
+  Disposable, Position, Range, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent,
+  TextLine, workspace
+} from 'vscode';
 import * as textUtil from './text-util';
 import { IGrammar, IToken, StackElement } from 'vscode-textmate';
 import { last } from 'ks-util';
 
 export interface Token {
-  range: vscode.Range;
+  range: Range;
   text: string;
   scopes: string[];
   category: string;
 }
 
 export interface ScopeInfoAPI {
-  getScopeAt(document: vscode.TextDocument, position: vscode.Position): Token;
+  getScopeAt(document: TextDocument, position: Position): Token;
   getGrammar(scopeName: string): Promise<IGrammar>;
   getScopeForLanguage(language: string): string;
 }
 
-export class DocumentController implements vscode.Disposable {
-  private subscriptions: vscode.Disposable[] = [];
+export class DocumentController implements Disposable {
+  private subscriptions: Disposable[] = [];
 
   // Stores the state for each line
   private grammarState: StackElement[] = [];
   private grammar: IGrammar;
 
-  public constructor(doc: vscode.TextDocument, textMateGrammar: IGrammar,
+  public constructor(doc: TextDocument, textMateGrammar: IGrammar,
     private document = doc,
   ) {
     this.grammar = textMateGrammar;
 
     // Parse whole document
-    const docRange = new vscode.Range(0, 0, this.document.lineCount, 0);
+    const docRange = new Range(0, 0, this.document.lineCount, 0);
     this.reparsePretties(docRange);
 
-    this.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => {
+    this.subscriptions.push(workspace.onDidChangeTextDocument(e => {
       if (e.document === this.document)
         this.onChangeDocument(e);
     }));
@@ -42,8 +45,7 @@ export class DocumentController implements vscode.Disposable {
     this.subscriptions.forEach(s => s.dispose());
   }
 
-
-  private refreshTokensOnLine(line: vscode.TextLine): { tokens: IToken[], invalidated: boolean } {
+  private refreshTokensOnLine(line: TextLine): { tokens: IToken[], invalidated: boolean } {
     if (!this.grammar)
       return { tokens: [], invalidated: false };
 
@@ -55,7 +57,7 @@ export class DocumentController implements vscode.Disposable {
     return { tokens: lineTokens.tokens, invalidated: invalidated };
   }
 
-  public getScopeAt(position: vscode.Position): Token | null {
+  public getScopeAt(position: Position): Token | null {
     if (!this.grammar)
       return null;
 
@@ -67,7 +69,7 @@ export class DocumentController implements vscode.Disposable {
     for (const t of tokens.tokens) {
       if (t.startIndex <= position.character && position.character < t.endIndex)
         return {
-          range: new vscode.Range(position.line, t.startIndex, position.line, t.endIndex),
+          range: new Range(position.line, t.startIndex, position.line, t.endIndex),
           text: line.text.substring(t.startIndex, t.endIndex),
           scopes: t.scopes,
           category: this.scopesToCategory(t.scopes)
@@ -79,7 +81,10 @@ export class DocumentController implements vscode.Disposable {
 
   private scopesToCategory(scopes: string[]): string {
     if (scopes.length > 0) {
-      const scope = last(scopes);
+      let scope = last(scopes);
+
+      if (/\b(invalid|illegal)\b/.test(scope) && scopes.length > 1)
+        scope = scopes[scopes.length - 2];
 
       if (/\boperator|accessor|arrow\b/.test(scope))
         return 'operator';
@@ -88,27 +93,43 @@ export class DocumentController implements vscode.Disposable {
       else if (/^string\b/.test(scope))
         return 'string';
       else if (/^punctuation\.definition\.comment\b/.test(scope))
-        return 'comment-marker';
+        return 'comment_marker';
       else if (/\bcomment\b/.test(scope))
         return 'comment';
-      else if (/^variable\b/.test(scope))
+      else if (/^(variable\.language|storage)\b/.test(scope))
+        return 'keyword';
+      else if (/^(support\.)?variable\b/.test(scope))
         return 'variable';
       else if (/^constant\.numeric\b/.test(scope))
         return 'number';
+      else if (/^constant\.language\b/.test(scope))
+        return 'keyword';
       else if (/^constant\b/.test(scope))
         return 'constant';
       else if (/\bfunction\b/.test(scope))
         return 'function';
+      else if (/\bproperty-name\b/.test(scope))
+        return 'property_name';
       else if (/^support\.type\b/.test(scope))
         return 'type';
+      else if (/\bname\.tag\b/.test(scope))
+        return 'tag';
+      else if (/\battribute-name\b/.test(scope))
+        return 'attribute_name';
+      else if (/\btext\b/.test(scope))
+        return 'text';
       else if (/^(keyword|storage\.type)\b/.test(scope))
         return 'keyword';
+      else if (/(^punctuation)|(\bbrace)\b/.test(scope))
+        return 'punctuation';
+      else if (/\bmarkdown$/.test(scope)) // For now, consider all Markdown that isn't punctuation to be text.
+        return 'text';
     }
 
     return 'other';
   }
 
-  private reparsePretties(range: vscode.Range): void {
+  private reparsePretties(range: Range): void {
     range = this.document.validateRange(range);
 
     const startCharacter = 0;
@@ -125,7 +146,7 @@ export class DocumentController implements vscode.Disposable {
     }
   }
 
-  private applyChanges(changes: readonly vscode.TextDocumentContentChangeEvent[]): void {
+  private applyChanges(changes: readonly TextDocumentContentChangeEvent[]): void {
     const sortedChanges =
       changes.slice(0).sort((change1, change2) => change1.range.start.isAfter(change2.range.start) ? -1 : 1);
     for (const change of sortedChanges) {
@@ -140,13 +161,13 @@ export class DocumentController implements vscode.Disposable {
     }
   }
 
-  private onChangeDocument(event: vscode.TextDocumentChangeEvent): void {
+  private onChangeDocument(event: TextDocumentChangeEvent): void {
     this.applyChanges(event.contentChanges);
   }
 
   public refresh(): void {
     this.grammarState = [];
-    const docRange = new vscode.Range(0, 0, this.document.lineCount, 0);
+    const docRange = new Range(0, 0, this.document.lineCount, 0);
     this.reparsePretties(docRange);
   }
 }

@@ -46,9 +46,9 @@ export function activate(context: ExtensionContext): void {
     if (attempt > 5)
       return;
 
-    const editor = getFirstEditor(document);
+    const editors = getEditors(document);
 
-    if (!isValidDocument(document) || !editor)
+    if (!isValidDocument(document) || !editors)
       return;
 
     if (!scopeInfoApi.getScopeAt(document, new Position(0, 0))) {
@@ -56,10 +56,13 @@ export function activate(context: ExtensionContext): void {
       return;
     }
 
-    lookForLigatures(document, editor, 0, document.lineCount - 1);
+    editors.forEach(editor => lookForLigatures(document, editor, 0, document.lineCount - 1));
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number): void {
+    if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
+      return;
+
     const ranges: Range[] = [];
     const started = processMillis();
 
@@ -79,8 +82,8 @@ export function activate(context: ExtensionContext): void {
         }
       }
 
-      if (processMillis() > started + 100) {
-        setTimeout(() => lookForLigatures(document, editor, i + 1, last), 100);
+      if (processMillis() > started + 50) {
+        setTimeout(() => lookForLigatures(document, editor, i + 1, last), 50);
         break;
       }
     }
@@ -99,13 +102,15 @@ function isValidDocument(document: TextDocument): boolean {
         this.settings.excludedLanguages.has(document.languageId) */);
 }
 
-function getFirstEditor(document: TextDocument): TextEditor {
+function getEditors(document: TextDocument): TextEditor[] {
+  const editors: TextEditor[] = [];
+
   for (const editor of window.visibleTextEditors) {
     if (editor.document === document)
-      return editor;
+      editors.push(editor);
   }
 
-  return undefined;
+  return editors.length > 0 ? editors : undefined;
 }
 
 export function deactivate(): void {
