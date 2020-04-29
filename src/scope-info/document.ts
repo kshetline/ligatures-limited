@@ -1,22 +1,20 @@
-import * as vscode from 'vscode';
+import vscode from 'vscode';
 import * as textUtil from './text-util';
 import { IGrammar, IToken, StackElement } from 'vscode-textmate';
+import { last } from 'ks-util';
 
 export interface Token {
   range: vscode.Range;
   text: string;
   scopes: string[];
+  category: string;
 }
 
 export interface ScopeInfoAPI {
-  getScopeAt(document: vscode.TextDocument, position: vscode.Position): Token | null;
-  getGrammar(scopeName: string): Promise<IGrammar | null>;
-  getScopeForLanguage(language: string): string | null;
+  getScopeAt(document: vscode.TextDocument, position: vscode.Position): Token;
+  getGrammar(scopeName: string): Promise<IGrammar>;
+  getScopeForLanguage(language: string): string;
 }
-
-const debugging = false;
-const activeEditorDecorationTimeout = 20;
-const inactiveEditorDecorationTimeout = 200;
 
 export class DocumentController implements vscode.Disposable {
   private subscriptions: vscode.Disposable[] = [];
@@ -48,25 +46,66 @@ export class DocumentController implements vscode.Disposable {
   private refreshTokensOnLine(line: vscode.TextLine): { tokens: IToken[], invalidated: boolean } {
     if (!this.grammar)
       return { tokens: [], invalidated: false };
+
     const prevState = this.grammarState[line.lineNumber - 1] || null;
     const lineTokens = this.grammar.tokenizeLine(line.text, prevState);
     const invalidated = !this.grammarState[line.lineNumber] || !lineTokens.ruleStack.equals(this.grammarState[line.lineNumber]);
     this.grammarState[line.lineNumber] = lineTokens.ruleStack;
+
     return { tokens: lineTokens.tokens, invalidated: invalidated };
   }
 
   public getScopeAt(position: vscode.Position): Token | null {
     if (!this.grammar)
       return null;
+
     position = this.document.validatePosition(position);
     const state = this.grammarState[position.line - 1] || null;
     const line = this.document.lineAt(position.line);
     const tokens = this.grammar.tokenizeLine(line.text, state);
+
     for (const t of tokens.tokens) {
       if (t.startIndex <= position.character && position.character < t.endIndex)
-        return { range: new vscode.Range(position.line, t.startIndex, position.line, t.endIndex), text: line.text.substring(t.startIndex, t.endIndex), scopes: t.scopes };
+        return {
+          range: new vscode.Range(position.line, t.startIndex, position.line, t.endIndex),
+          text: line.text.substring(t.startIndex, t.endIndex),
+          scopes: t.scopes,
+          category: this.scopesToCategory(t.scopes)
+        };
     }
+
     return null;
+  }
+
+  private scopesToCategory(scopes: string[]): string {
+    if (scopes.length > 0) {
+      const scope = last(scopes);
+
+      if (/\boperator|accessor|arrow\b/.test(scope))
+        return 'operator';
+      else if (/^string\.regexp\b/.test(scope))
+        return 'regexp';
+      else if (/^string\b/.test(scope))
+        return 'string';
+      else if (/^punctuation\.definition\.comment\b/.test(scope))
+        return 'comment-marker';
+      else if (/\bcomment\b/.test(scope))
+        return 'comment';
+      else if (/^variable\b/.test(scope))
+        return 'variable';
+      else if (/^constant\.numeric\b/.test(scope))
+        return 'number';
+      else if (/^constant\b/.test(scope))
+        return 'constant';
+      else if (/\bfunction\b/.test(scope))
+        return 'function';
+      else if (/^support\.type\b/.test(scope))
+        return 'type';
+      else if (/^(keyword|storage\.type)\b/.test(scope))
+        return 'keyword';
+    }
+
+    return 'other';
   }
 
   private reparsePretties(range: vscode.Range): void {

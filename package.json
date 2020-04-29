@@ -49,6 +49,7 @@
 		}
 	},
 	"dependencies": {
+		"ks-util": "^1.11.0",
 		"vscode-test": "^1.3.0",
 		"vscode-textmate": "^5.1.1"
 	}

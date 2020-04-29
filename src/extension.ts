@@ -1,10 +1,24 @@
+import { processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate } from './scope-info/scope-info';
-import { ExtensionContext, TextDocument, TextEditor, window, workspace, Position } from 'vscode';
+import { ExtensionContext, Range, TextDocument, TextEditor, window, workspace, Position } from 'vscode';
+
+const basicLigatures = ('.= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==> ' +
+  '=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .} ' +
+  '<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\\\ \\\\\\ \\* */ /// // <// <!== </> --> /> ' +
+  ';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ' +
+  '-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(').split(/\s+/);
+const disabledLigatures = new Set<string>();
+const escapeRegex = /[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g;
+let matchLigatures: RegExp;
 
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
   const decoration = window.createTextEditorDecorationType({ color: '' });
   let configuration = readConfiguration();
+
+  basicLigatures.sort((a, b) => b.length - a.length);
+  matchLigatures = new RegExp(basicLigatures.map(lg => lg.replace(escapeRegex, '\\$&')).join('|'), 'g');
+  workspace.textDocuments.forEach(document => openDocument(document));
 
   workspace.onDidChangeConfiguration(configChangeEvent => {
     configuration = readConfiguration();
@@ -16,73 +30,82 @@ export function activate(context: ExtensionContext): void {
   });
 
   workspace.onDidChangeTextDocument(changeEvent => {
-    if (changeEvent.contentChanges.length > 0) {
-      console.log(changeEvent);
-    }
+    if (changeEvent.contentChanges.length > 0)
+      openDocument(changeEvent.document);
   });
 
   workspace.onDidCloseTextDocument(document => {
-    console.log(document);
+    console.log('onDidCloseTextDocument:', document);
   });
 
   workspace.onDidOpenTextDocument(document => {
     openDocument(document);
   });
 
-  function openDocument(document: TextDocument): void {
-    if (isValidDocument(document) && getFirstEditor(document)) {
-      console.log(document, scopeInfoApi.getScopeAt(document, new Position(0, 0)));
+  function openDocument(document: TextDocument, attempt = 1): void {
+    if (attempt > 5)
+      return;
+
+    const editor = getFirstEditor(document);
+
+    if (!isValidDocument(document) || !editor)
+      return;
+
+    if (!scopeInfoApi.getScopeAt(document, new Position(0, 0))) {
+      setTimeout(() => openDocument(document, ++attempt), 250);
+      return;
     }
+
+    lookForLigatures(document, editor, 0, document.lineCount - 1);
   }
 
-  // function disableLigatures(event: TextEditorSelectionChangeEvent) {
-  //   const editor = event.textEditor;
+  function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number): void {
+    const ranges: Range[] = [];
+    const started = processMillis();
 
-  //   const positions = selectionsToMap(event.selections);
-  //   const ranges: Range[] = [];
+    for (let i = first; i <= last; ++i) {
+      const line = document.lineAt(i).text;
+      let match: RegExpExecArray;
 
-  //   for (const [lineNumber, charPositions] of positions) {
-  //     const text = editor.document.lineAt(lineNumber).text;
+      while ((match = matchLigatures.exec(line))) {
+        const index = match.index;
+        const ligature = match[0];
+        const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
+        // console.log('match: %s, token: %s, line: %s, pos: %s, ', ligature, scope.text, i, index, scope.category); // , scope.scopes.join(', '));
 
-  //     for (const position of charPositions) {
-  //       let match: RegExpExecArray | null;
-  //       // tslint:disable-next-line:no-conditional-assignment
-  //       while ((match = configuration.regex.exec(text)) !== null) {
-  //         if (configuration.mode === "Line") {
-  //           ranges.push(...matchLine(lineNumber, match));
-  //         }
-  //         else if (configuration.mode === "Cursor") {
-  //           ranges.push(...matchCursor(lineNumber, position, match));
-  //         }
-  //         else {
-  //           throw new Error("Invalid Mode");
-  //         }
-  //       }
-  //     }
-  //   }
+        if (scope.category !== 'operator') {
+          for (let j = 0; j < ligature.length; ++j)
+            ranges.push(new Range(i, index + j, i, index + j + 1));
+        }
+      }
 
-  //   editor.setDecorations(decoration, ranges);
-  // }
+      if (processMillis() > started + 100) {
+        setTimeout(() => lookForLigatures(document, editor, i + 1, last), 100);
+        break;
+      }
+    }
 
-  function readConfiguration(): any {
-    return workspace.getConfiguration().get('ligaturesLimited') as any;
+    editor.setDecorations(decoration, ranges);
   }
+}
 
-  function isValidDocument(document: TextDocument): boolean {
-    return (document !== undefined && document.lineCount > 0 &&
-      document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output' && document.languageId === 'typescript' /* &&
+function readConfiguration(): any {
+  return workspace.getConfiguration().get('ligaturesLimited') as any;
+}
+
+function isValidDocument(document: TextDocument): boolean {
+  return (document !== undefined && document.lineCount > 0 &&
+    document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output' && document.languageId === 'typescript' /* &&
         this.settings.excludedLanguages.has(document.languageId) */);
+}
+
+function getFirstEditor(document: TextDocument): TextEditor {
+  for (const editor of window.visibleTextEditors) {
+    if (editor.document === document)
+      return editor;
   }
 
-  function getFirstEditor(document: TextDocument): TextEditor {
-    for (const editor of window.visibleTextEditors) {
-      if (editor.document === document)
-        return editor;
-    }
-
-    console.log('not found');
-    return undefined;
-  }
+  return undefined;
 }
 
 export function deactivate(): void {
