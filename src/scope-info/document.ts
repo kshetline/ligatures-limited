@@ -93,6 +93,8 @@ export class DocumentController implements Disposable {
         return 'comment_marker';
       else if (/\bcomment\b/.test(scope))
         return 'comment';
+      else if (/\bproperty-name\b/.test(scope))
+        return 'property_name';
       else if (/^(support\.type)|(storage\.type\.built-in)\b/.test(scope))
         return 'type';
       else if (/^(variable\.language|storage)\b/.test(scope))
@@ -111,8 +113,6 @@ export class DocumentController implements Disposable {
         return 'scope';
       else if (/\bfunction\b/.test(scope))
         return 'function';
-      else if (/\bproperty-name\b/.test(scope))
-        return 'property_name';
       else if (/\bname\.tag\b/.test(scope))
         return 'tag';
       else if (/\battribute-name\b/.test(scope))

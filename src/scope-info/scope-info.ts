@@ -34,6 +34,8 @@ interface ExtensionPackage {
   };
 }
 
+let compactScope = true;
+
 function getLanguageScopeName(languageId: string): string {
   try {
     const extLanguages =
@@ -108,11 +110,17 @@ async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
         if (prettyDoc) {
           const token = prettyDoc.getScopeAt(pos);
 
-          if (token)
+          if (token) {
+            let scopeLines = token.scopes;
+
+            if (compactScope)
+              scopeLines = [scopeLines.join(', ')];
+
             return {
-              contents: [`Token: \`${token.text}\``, `Category: \`${token.category}\``, ...token.scopes],
+              contents: [`Token: \`${token.text}\``, `Category: \`${token.category}\``, ...scopeLines],
               range: token.range
             };
+          }
         }
       }
       catch (err) { }
@@ -173,6 +181,10 @@ export function isHoverEnabled(): boolean {
 
 export function setHover(enabled: boolean): void {
   hoverEnabled = enabled;
+}
+
+export function setCompactScope(enabled: boolean): void {
+  compactScope = enabled;
 }
 
 /** Re-read the settings and recreate substitutions for all documents */
