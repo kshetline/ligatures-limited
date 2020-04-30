@@ -150,7 +150,7 @@ export function activate(context: ExtensionContext): ScopeInfoAPI {
 
       return null;
     },
-    getScopeForLanguage(language: string): string | null {
+    getScopeForLanguage(language: string): string {
       return getLanguageScopeName(language) || null;
     },
     async getGrammar(scopeName: string): Promise<IGrammar> {
@@ -176,7 +176,7 @@ export function setHover(enabled: boolean): void {
 }
 
 /** Re-read the settings and recreate substitutions for all documents */
-function reloadGrammar(): void {
+export function reloadGrammar(): void {
   try {
     textMateRegistry = new Registry(grammarLocator);
     cachedGrammars.clear();

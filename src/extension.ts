@@ -1,27 +1,30 @@
 import { processMillis } from 'ks-util';
-import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate } from './scope-info/scope-info';
+import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Range, TextDocument, TextEditor, window, workspace, Position } from 'vscode';
 
-const basicLigatures = ('.= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==> ' +
-  '=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .} ' +
-  '<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\\\ \\\\\\ \\* */ /// // <// <!== </> --> /> ' +
-  ';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ' +
-  '-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(').split(/\s+/);
+const basicLigatures = String.raw`.= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
+  '=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
+  '<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* */ /// // <// <!== </> --> />
+  ';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www
+  '-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_('`.split(/\s+/);
 const disabledLigatures = new Set<string>();
 const escapeRegex = /[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g;
 let matchLigatures: RegExp;
 
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
-  const decoration = window.createTextEditorDecorationType({ color: '' });
+  let breakLigature = window.createTextEditorDecorationType({ color: '' });
+  const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: 'white' });
   let configuration = readConfiguration();
+  const debug = true;
 
-  basicLigatures.sort((a, b) => b.length - a.length);
-  matchLigatures = new RegExp(basicLigatures.map(lg => lg.replace(escapeRegex, '\\$&')).join('|'), 'g');
-  workspace.textDocuments.forEach(document => openDocument(document));
+  if (debug)
+    breakLigature = window.createTextEditorDecorationType({ color: 'red', backgroundColor: 'white' });
 
   workspace.onDidChangeConfiguration(configChangeEvent => {
     configuration = readConfiguration();
+    reloadGrammar();
+    init();
   }, null, context.subscriptions);
 
   window.onDidChangeVisibleTextEditors(() => {
@@ -42,6 +45,14 @@ export function activate(context: ExtensionContext): void {
     openDocument(document);
   });
 
+  init();
+
+  function init(): void {
+    basicLigatures.sort((a, b) => b.length - a.length);
+    matchLigatures = new RegExp(basicLigatures.map(lg => lg.replace(escapeRegex, '\\$&')).join('|'), 'g');
+    workspace.textDocuments.forEach(document => openDocument(document));
+  }
+
   function openDocument(document: TextDocument, attempt = 1): void {
     if (attempt > 5)
       return;
@@ -59,11 +70,11 @@ export function activate(context: ExtensionContext): void {
     editors.forEach(editor => lookForLigatures(document, editor, 0, document.lineCount - 1));
   }
 
-  function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number): void {
+  function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
+    breaks: Range[] = [], highlights: Range[] = []): void {
     if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
       return;
 
-    const ranges: Range[] = [];
     const started = processMillis();
 
     for (let i = first; i <= last; ++i) {
@@ -72,23 +83,38 @@ export function activate(context: ExtensionContext): void {
 
       while ((match = matchLigatures.exec(line))) {
         const index = match.index;
-        const ligature = match[0];
+        let ligature = match[0];
+        let shortened = false;
         const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
+
+        // Did the matched ligature overshoot a token boundary?
+        if (ligature.length > scope.text.length) {
+          shortened = true;
+          matchLigatures.lastIndex -= ligature.length - scope.text.length;
+          ligature = ligature.substr(0, scope.text.length);
+        }
+
         // console.log('match: %s, token: %s, line: %s, pos: %s, ', ligature, scope.text, i, index, scope.category); // , scope.scopes.join(', '));
 
-        if (scope.category !== 'operator') {
+        if (shortened ||
+          (scope.category !== 'operator' && scope.category !== 'comment_marker' && scope.category !== 'punctuation')) {
           for (let j = 0; j < ligature.length; ++j)
-            ranges.push(new Range(i, index + j, i, index + j + 1));
+            breaks.push(new Range(i, index + j, i, index + j + 1));
         }
+        else if (debug)
+          highlights.push(new Range(i, index, i, index + ligature.length));
       }
 
       if (processMillis() > started + 50) {
-        setTimeout(() => lookForLigatures(document, editor, i + 1, last), 50);
-        break;
+        setTimeout(() => lookForLigatures(document, editor, i + 1, last, breaks, highlights), 50);
+        return;
       }
     }
 
-    editor.setDecorations(decoration, ranges);
+    editor.setDecorations(breakLigature, breaks);
+
+    if (debug)
+      editor.setDecorations(highlightLigature, highlights);
   }
 }
 
@@ -98,7 +124,7 @@ function readConfiguration(): any {
 
 function isValidDocument(document: TextDocument): boolean {
   return (document !== undefined && document.lineCount > 0 &&
-    document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output' && document.languageId === 'typescript' /* &&
+    document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output' /* &&
         this.settings.excludedLanguages.has(document.languageId) */);
 }
 

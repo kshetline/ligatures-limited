@@ -21,16 +21,10 @@ export interface ScopeInfoAPI {
 
 export class DocumentController implements Disposable {
   private subscriptions: Disposable[] = [];
-
   // Stores the state for each line
   private grammarState: StackElement[] = [];
-  private grammar: IGrammar;
 
-  public constructor(doc: TextDocument, textMateGrammar: IGrammar,
-    private document = doc,
-  ) {
-    this.grammar = textMateGrammar;
-
+  public constructor(private document: TextDocument, private grammar: IGrammar) {
     // Parse whole document
     const docRange = new Range(0, 0, this.document.lineCount, 0);
     this.reparsePretties(docRange);
@@ -57,7 +51,7 @@ export class DocumentController implements Disposable {
     return { tokens: lineTokens.tokens, invalidated: invalidated };
   }
 
-  public getScopeAt(position: Position): Token | null {
+  public getScopeAt(position: Position): Token {
     if (!this.grammar)
       return null;
 
@@ -67,26 +61,29 @@ export class DocumentController implements Disposable {
     const tokens = this.grammar.tokenizeLine(line.text, state);
 
     for (const t of tokens.tokens) {
-      if (t.startIndex <= position.character && position.character < t.endIndex)
+      if (t.startIndex <= position.character && position.character < t.endIndex) {
+        const text = line.text.substring(t.startIndex, t.endIndex);
+
         return {
           range: new Range(position.line, t.startIndex, position.line, t.endIndex),
-          text: line.text.substring(t.startIndex, t.endIndex),
+          text,
           scopes: t.scopes,
-          category: this.scopesToCategory(t.scopes)
+          category: this.scopesToCategory(t.scopes, text.trim())
         };
+      }
     }
 
     return null;
   }
 
-  private scopesToCategory(scopes: string[]): string {
+  private scopesToCategory(scopes: string[], text: string): string {
     if (scopes.length > 0) {
       let scope = last(scopes);
 
       if (/\b(invalid|illegal)\b/.test(scope) && scopes.length > 1)
         scope = scopes[scopes.length - 2];
 
-      if (/\boperator|accessor|arrow\b/.test(scope))
+      if (/\boperator|accessor|arrow|pointer-access|dot-access\b/.test(scope))
         return 'operator';
       else if (/^string\.regexp\b/.test(scope))
         return 'regexp';
@@ -96,6 +93,8 @@ export class DocumentController implements Disposable {
         return 'comment_marker';
       else if (/\bcomment\b/.test(scope))
         return 'comment';
+      else if (/^(support\.type)|(storage\.type\.built-in)\b/.test(scope))
+        return 'type';
       else if (/^(variable\.language|storage)\b/.test(scope))
         return 'keyword';
       else if (/^(support\.)?variable\b/.test(scope))
@@ -106,12 +105,14 @@ export class DocumentController implements Disposable {
         return 'keyword';
       else if (/^constant\b/.test(scope))
         return 'constant';
+      else if (/\bseparator\.scope-resolution\b/.test(scope))
+        return 'operator';
+      else if (/\bscope-resolution\b/.test(scope))
+        return 'scope';
       else if (/\bfunction\b/.test(scope))
         return 'function';
       else if (/\bproperty-name\b/.test(scope))
         return 'property_name';
-      else if (/^support\.type\b/.test(scope))
-        return 'type';
       else if (/\bname\.tag\b/.test(scope))
         return 'tag';
       else if (/\battribute-name\b/.test(scope))
@@ -124,6 +125,13 @@ export class DocumentController implements Disposable {
         return 'punctuation';
       else if (/\bmarkdown$/.test(scope)) // For now, consider all Markdown that isn't punctuation to be text.
         return 'text';
+      else if (/\s/.test(text))
+        return 'invalid';
+      // Oddly some identifier in C++ aren't being identified by TextMate at all, only the scope in which
+      // they are embedded. I'll treat those as variables if the text looks like a variable name.
+      // Below is a fairly generous, but not exhaustive, regex for matching valid identifiers.
+      else if (/^(meta|source)\b/.test(scope) && /^[\p{L}$_·][\p{L}\p{M}\p{N}$_·]*$/u.test(text))
+        return 'identifier';
     }
 
     return 'other';
