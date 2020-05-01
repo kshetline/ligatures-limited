@@ -1,31 +1,49 @@
-import { processMillis } from 'ks-util';
+import { last as _last, processMillis } from 'ks-util';
 import {
   activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar,
   setCompactScope
 } from './scope-info/scope-info';
-import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace } from 'vscode';
+import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection } from 'vscode';
 
 const basicLigatures = String.raw`.= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
   '=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
   '<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* */ /// // <// <!-- </> --> />
-  ';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www
+  ';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl
   '-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_('`.split(/\s+/);
-const disabledLigatures = new Set<string>();
+const disabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl']);
+const ligatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation']);
 const escapeRegex = /[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g;
+const breakNormal = window.createTextEditorDecorationType({ color: '' });
+const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: 'white' });
+
 let matchLigatures: RegExp;
+
+type SelectionMode = 'cursor' | 'line' | 'off' | 'selection';
+
+interface LLConfiguration {
+  additionalLigatures: string | string[];
+  alwaysAllowed: string | string[];
+  alwaysDisabled: string | string[];
+  alwaysIgnored: string | string[];
+  compactScope: boolean;
+  debug: boolean;
+  selectionMode: SelectionMode;
+
+  languages: Record<string, {
+    alwaysAllowed: string | string[];
+    alwaysDisabled: string | string[];
+  }>;
+}
 
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
-  let breakLigature = window.createTextEditorDecorationType({ color: '' });
+  let breakLigature = breakNormal;
   const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: 'white' });
-  let configuration = readConfiguration();
+  let configuration = readConfiguration() as LLConfiguration;
   let debug = false;
-  let selectionMode = 'off';
+  let selectionMode: SelectionMode = 'off';
 
-  if (debug)
-    breakLigature = window.createTextEditorDecorationType({ color: 'red', backgroundColor: 'white' });
-
-  workspace.onDidChangeConfiguration(configChangeEvent => {
+  workspace.onDidChangeConfiguration(() => {
     configuration = readConfiguration();
     reloadGrammar();
     init();
@@ -54,10 +72,16 @@ export function activate(context: ExtensionContext): void {
 
   function init(): void {
     debug = !!configuration?.debug;
-    setCompactScope(!!configuration?.compactScope);
-    selectionMode = configuration?.selectionMode?.toString().toLowerCase() || 'off';
 
-    if (!/^cursor|line|off$/.test(selectionMode))
+    if (debug)
+      breakLigature = breakDebug;
+    else
+      breakLigature = breakNormal;
+
+    setCompactScope(!!configuration?.compactScope);
+    selectionMode = (configuration?.selectionMode?.toString().toLowerCase() || 'off') as SelectionMode;
+
+    if (!/^(cursor|line|off|selection)$/.test(selectionMode))
       throw new Error('Invalid selectionMode');
 
     basicLigatures.sort((a, b) => b.length - a.length);
@@ -99,6 +123,8 @@ export function activate(context: ExtensionContext): void {
         let selected = false;
         let shortened = false;
         const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
+        const category = scope.category;
+        const specificScope = _last(scope.scopes);
 
         // Did the matched ligature overshoot a token boundary?
         if (ligature.length > scope.text.length) {
@@ -107,7 +133,7 @@ export function activate(context: ExtensionContext): void {
           ligature = ligature.substr(0, scope.text.length);
         }
 
-        if (selectionMode && selectionMode !== 'off' && editor.selections) {
+        if (selectionMode !== 'off' && editor.selections?.length > 0 && (isInsert(editor.selections) || selectionMode !== 'cursor')) {
           const range = selectionMode === 'line' ?
             new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
 
@@ -120,8 +146,8 @@ export function activate(context: ExtensionContext): void {
 
         // console.log('match: %s, token: %s, line: %s, pos: %s, ', ligature, scope.text, i, index, scope.category); // , scope.scopes.join(', '));
 
-        if (shortened || selected ||
-          (scope.category !== 'operator' && scope.category !== 'comment_marker' && scope.category !== 'punctuation')) {
+        if (shortened || selected || disabledLigatures.has(ligature) ||
+          (!ligatureContexts.has(category) && !ligatureContexts.has(specificScope))) {
           for (let j = 0; j < ligature.length; ++j)
             breaks.push(new Range(i, index + j, i, index + j + 1));
         }
@@ -161,6 +187,10 @@ function getEditors(document: TextDocument): TextEditor[] {
   }
 
   return editors.length > 0 ? editors : undefined;
+}
+
+function isInsert(selections: Selection[]): boolean {
+  return selections && selections.length === 1 && selections[0].start.isEqual(selections[0].end);
 }
 
 export function deactivate(): void {

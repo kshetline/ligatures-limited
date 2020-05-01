@@ -1,11 +1,16 @@
 {
   "rules": {
-    "arrow-parens": [true, "ban-single-arg-parens"],
+    "arrow-parens": [
+      true,
+      "ban-single-arg-parens"
+    ],
     "class-name": true,
     "comment-format": [
       true,
       "check-space",
-      {"ignore-pattern": "noinspection.*"}
+      {
+        "ignore-pattern": "noinspection.*"
+      }
     ],
     "curly": false,
     "eofline": true,
@@ -33,7 +38,9 @@
     "no-duplicate-variable": true,
     "no-empty": false,
     "no-eval": true,
-    "no-inferrable-types": [true],
+    "no-inferrable-types": [
+      true
+    ],
     "no-shadowed-variable": true,
     "no-string-literal": false,
     "no-switch-case-fall-through": false,
@@ -87,5 +94,11 @@
       "check-type"
     ],
     "prefer-const": true
+  },
+  "linterOptions": {
+    "exclude": [
+      "node_modules",
+      "out"
+    ]
   }
 }

@@ -1,10 +1,10 @@
+import { last } from 'ks-util';
+import * as textUtil from './text-util';
 import {
   Disposable, Position, Range, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent,
-  TextLine, workspace
+  TextLine, window, workspace
 } from 'vscode';
-import * as textUtil from './text-util';
 import { IGrammar, IToken, StackElement } from 'vscode-textmate';
-import { last } from 'ks-util';
 
 export interface Token {
   range: Range;
@@ -29,14 +29,23 @@ export class DocumentController implements Disposable {
     const docRange = new Range(0, 0, this.document.lineCount, 0);
     this.reparsePretties(docRange);
 
-    this.subscriptions.push(workspace.onDidChangeTextDocument(e => {
-      if (e.document === this.document)
-        this.onChangeDocument(e);
+    this.subscriptions.push(workspace.onDidChangeTextDocument(event => {
+      if (event.document === this.document)
+        this.onChangeDocument(event);
     }));
   }
 
   public dispose(): void {
-    this.subscriptions.forEach(s => s.dispose());
+    this.subscriptions.forEach(sub => sub.dispose());
+  }
+
+  public hasEditor(): boolean {
+    for (const editor of window.visibleTextEditors) {
+      if (editor.document === this.document)
+        return true;
+    }
+
+    return false;
   }
 
   private refreshTokensOnLine(line: TextLine): { tokens: IToken[], invalidated: boolean } {
@@ -95,6 +104,8 @@ export class DocumentController implements Disposable {
         return 'comment';
       else if (/\bproperty-name\b/.test(scope))
         return 'property_name';
+      else if (/\bproperty-value\b/.test(scope))
+        return 'property_value';
       else if (/^(support\.type)|(storage\.type\.built-in)\b/.test(scope))
         return 'type';
       else if (/^(variable\.language|storage)\b/.test(scope))
@@ -140,8 +151,6 @@ export class DocumentController implements Disposable {
   private reparsePretties(range: Range): void {
     range = this.document.validateRange(range);
 
-    const startCharacter = 0;
-
     let invalidatedTokenState = false;
 
     // Collect new pretties
@@ -162,7 +171,7 @@ export class DocumentController implements Disposable {
         const delta = textUtil.toRangeDelta(change.range, change.text);
         const editRange = textUtil.rangeDeltaNewRange(delta);
 
-        const reparsed = this.reparsePretties(editRange);
+        this.reparsePretties(editRange);
       } catch (e) {
         console.error(e);
       }

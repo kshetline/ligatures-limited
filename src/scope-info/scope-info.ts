@@ -105,9 +105,9 @@ async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
         return;
 
       try {
-        const prettyDoc = documents.get(doc.uri);
+        const prettyDoc: DocumentController = documents.get(doc.uri);
 
-        if (prettyDoc) {
+        if (prettyDoc?.hasEditor()) {
           const token = prettyDoc.getScopeAt(pos);
 
           if (token) {
@@ -151,7 +151,7 @@ export function activate(context: ExtensionContext): ScopeInfoAPI {
       try {
         const prettyDoc = documents.get(document.uri);
 
-        if (prettyDoc)
+        if (prettyDoc?.hasEditor())
           return prettyDoc.getScopeAt(position);
       }
       catch (err) { }
@@ -237,7 +237,7 @@ async function openDocument(doc: TextDocument): Promise<void> {
   try {
     const prettyDoc = documents.get(doc.uri);
 
-    if (prettyDoc)
+    if (prettyDoc?.hasEditor())
       prettyDoc.refresh();
     else if (textMateRegistry) {
       const scopeName = getLanguageScopeName(doc.languageId);
