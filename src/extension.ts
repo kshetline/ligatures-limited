@@ -3,7 +3,7 @@ import {
   activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar,
   setCompactScope
 } from './scope-info/scope-info';
-import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection } from 'vscode';
+import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, languages } from 'vscode';
 
 type SelectionMode = 'cursor' | 'line' | 'off' | 'selection';
 
@@ -11,32 +11,25 @@ interface LLConfiguration {
   compactScopeDisplay?: boolean;
   contexts?: string | string[];
   debug?: boolean;
+  inherit?: string;
   ligatures?: string | string[];
+  ligaturesByContext: Record<string, string | string[]>;
   selectionMode?: SelectionMode;
-
-  byLanguage?: Record<string, {
-    contexts?: string | string[];
-    debug?: boolean;
-    inherit?: string;
-    ligatures?: string | string[];
-
-    byContext?: Record<string, {
-      ligatures?: string | string[];
-    }>;
-  }>;
 }
 
-type InternalConfig = Record<string, {
-  debug: boolean;
+interface InternalConfig {
+  compactScopeDisplay: boolean;
   contexts: Set<string>;
+  debug: boolean;
   ligatures: Set<string>;
   ligaturesListedAreEnabled: boolean;
+  selectionMode: SelectionMode;
 
-  byContext: Record<string, {
+  ligaturesByContext: Record<string, {
     ligatures: Set<string>;
     ligaturesListedAreEnabled: boolean;
   }>;
-}>;
+}
 
 const baseLigatures = String.raw`.= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
   '=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
@@ -46,15 +39,10 @@ const baseLigatures = String.raw`.= .- := =:= == != === !== =/= <-< <<- <-- <- <
 const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl']);
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation']);
 
-let configuration: LLConfiguration;
-let internalConfig: InternalConfig = {};
-let globalDebug = false;
-let globalLigatureContexts: Set<string>;
+let defaultConfiguration: InternalConfig;
+const configurationsByLanguage = new Map<string, InternalConfig>();
 let globalLigatures: Set<string>;
-let globalListedLigatures: Set<string>;
-let globalListedAreEnabled = false;
 let globalMatchLigatures: RegExp;
-let selectionMode: SelectionMode = 'off';
 
 const escapeRegex = /[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g;
 const breakNormal = window.createTextEditorDecorationType({ color: '' });
@@ -65,6 +53,8 @@ export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
 
   workspace.onDidChangeConfiguration(() => {
+    defaultConfiguration = undefined;
+    configurationsByLanguage.clear();
     readConfiguration();
     reloadGrammar();
     init();
@@ -119,11 +109,12 @@ export function activate(context: ExtensionContext): void {
       return;
 
     const started = processMillis();
-    const langConfig = internalConfig[document.languageId];
-    const langLigatures = langConfig?.ligatures ?? globalListedLigatures;
-    const contexts = langConfig?.contexts ?? globalLigatureContexts;
-    const langListedAreEnabled = langConfig?.ligaturesListedAreEnabled ?? globalListedAreEnabled;
-    const debug = langConfig?.debug ?? globalDebug;
+    const langConfig = readConfiguration(document.languageId);
+    const selectionMode = langConfig.selectionMode;
+    const langLigatures = langConfig.ligatures;
+    const contexts = langConfig.contexts;
+    const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
+    const debug = langConfig.debug;
 
     for (let i = first; i <= last; ++i) {
       const line = document.lineAt(i).text;
@@ -139,7 +130,7 @@ export function activate(context: ExtensionContext): void {
         const specificScope = _last(scope.scopes);
 
         // Did the matched ligature overshoot a token boundary?
-        if (ligature.length > scope.text.length) {
+        if (ligature.length > scope.text.length && ligature !== '?:') {
           shortened = true;
           globalMatchLigatures.lastIndex -= ligature.length - scope.text.length;
           ligature = ligature.substr(0, scope.text.length);
@@ -158,12 +149,12 @@ export function activate(context: ExtensionContext): void {
 
         // console.log('match: %s, token: %s, line: %s, pos: %s, ', ligature, scope.text, i, index, scope.category); // , scope.scopes.join(', '));
 
-        const contextConfig = (langConfig?.byContext && (langConfig.byContext[specificScope] ?? langConfig.byContext[category]));
+        const contextConfig = (langConfig.ligaturesByContext &&
+          (langConfig.ligaturesByContext[specificScope] ?? langConfig.ligaturesByContext[category]));
         const contextLigatures = contextConfig?.ligatures ?? langLigatures;
         const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
 
-        if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled ||
-          (!contexts.has(category) && !globalLigatureContexts.has(specificScope))) {
+        if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !contexts.has(category)) {
           for (let j = 0; j < ligature.length; ++j)
             breaks.push(new Range(i, index + j, i, index + j + 1));
         }
@@ -190,94 +181,104 @@ export function activate(context: ExtensionContext): void {
   }
 }
 
-function readConfiguration(): void {
-  configuration = workspace.getConfiguration().get('ligaturesLimited') as LLConfiguration;
-  internalConfig = {};
-  globalLigatures = new Set(baseLigatures);
-  globalListedLigatures = new Set(baseDisabledLigatures);
-  globalLigatureContexts = new Set(baseLigatureContexts);
-  globalDebug = !!configuration?.debug;
-  setCompactScope(!!configuration?.compactScopeDisplay);
-  selectionMode = (configuration?.selectionMode?.toString().toLowerCase() || 'off') as SelectionMode;
+function readConfiguration(language?: string, loopCheck = new Set<string>()): InternalConfig {
+  if (language && !defaultConfiguration)
+    defaultConfiguration = readConfiguration(null, loopCheck);
+  else if (!language && defaultConfiguration)
+    return defaultConfiguration;
 
-  if (!/^(cursor|line|off|selection)$/.test(selectionMode))
-    throw new Error('Invalid selectionMode');
+  let userConfig: LLConfiguration;
+  let template: InternalConfig;
 
-  applyContextList(globalLigatureContexts, configuration?.contexts);
-  globalListedAreEnabled = applyLigatureList(globalListedLigatures, configuration?.ligatures, false);
+  if (language) {
+    if (configurationsByLanguage.has(language))
+      return configurationsByLanguage.get(language);
 
-  const unresolvedInheritance = new Set<string>();
-  let lastResolvedCount = Number.MAX_SAFE_INTEGER;
-  const languageKeys = Object.keys(configuration?.byLanguage ?? {});
+    if (loopCheck.has(language))
+      throw new Error('Unresolved language inheritance for: ' + Array.from(loopCheck).join(', '));
 
-  while (true) {
-    for (const key of languageKeys) {
-      const lConfig = configuration?.byLanguage[key];
-      const languages = toStringArray(key).map(l => l.replace(/[[\]]/g, '').trim());
+    userConfig = workspace.getConfiguration(`[${language}]`).get('ligaturesLimited');
 
-      if (languages.length < 1 || internalConfig[languages[0]])
-        continue;
-
-      let langConfig = {
-        debug: !!(lConfig.debug ?? globalDebug),
-        contexts: new Set(globalLigatureContexts),
-        ligatures: new Set(globalListedLigatures),
-        ligaturesListedAreEnabled: globalListedAreEnabled,
-        byContext: {}
-      };
-
-      if (lConfig.inherit) {
-        langConfig = internalConfig[lConfig.inherit];
-
-        if (!langConfig) {
-          languages.forEach(l => unresolvedInheritance.add(l));
-          continue;
-        }
-        else
-          langConfig = clone(langConfig);
-      }
-
-      applyContextList(new Set(globalLigatureContexts), lConfig?.contexts);
-      langConfig.ligaturesListedAreEnabled = applyLigatureList(langConfig.ligatures, lConfig?.ligatures, langConfig.ligaturesListedAreEnabled);
-
-      const contextKeys = Object.keys(lConfig.byContext ?? {});
-
-      for (const cKey of contextKeys) {
-        const cConfig = lConfig.byContext[cKey];
-        const contexts = toStringArray(cKey);
-
-        if (contexts.length < 1)
-          continue;
-
-        const contextConfig = {
-          ligatures: new Set(langConfig.ligatures),
-          ligaturesListedAreEnabled: langConfig.ligaturesListedAreEnabled,
-        };
-
-        contextConfig.ligaturesListedAreEnabled = applyLigatureList(contextConfig.ligatures, cConfig.ligatures, contextConfig.ligaturesListedAreEnabled);
-        contexts.forEach(context => {
-          langConfig.byContext[context] = contextConfig;
-          langConfig.contexts.add(context);
-        });
-      }
-
-      languages.forEach(language => internalConfig[language] = langConfig);
+    if (userConfig?.inherit) {
+      loopCheck.add(language);
+      template = readConfiguration(userConfig.inherit, loopCheck);
     }
+  }
+  else
+    globalLigatures = new Set(baseLigatures);
 
-    if (unresolvedInheritance.size === 0 || unresolvedInheritance.size >= lastResolvedCount)
-      break;
+  if (!userConfig) {
+    userConfig = workspace.getConfiguration().get('ligaturesLimited');
 
-    lastResolvedCount = unresolvedInheritance.size;
-    unresolvedInheritance.clear();
+    if (userConfig?.inherit)
+      throw new Error('"inherit" is not a valid property for the root ligaturesLimited configuration.');
   }
 
-  if (unresolvedInheritance.size > 0)
-    throw new Error('Unresolved language inheritance for: ' + Array.from(unresolvedInheritance).join(', '));
+  if (!template) {
+    template = {
+      compactScopeDisplay: false,
+      contexts: baseLigatureContexts,
+      debug: false,
+      ligatures: new Set(baseDisabledLigatures),
+      ligaturesListedAreEnabled: false,
+      selectionMode: 'cursor' as SelectionMode,
+      ligaturesByContext: {}
+    };
+  }
+
+  const internalConfig = {
+    compactScopeDisplay: userConfig?.compactScopeDisplay ?? template.compactScopeDisplay,
+    contexts: new Set(template.contexts),
+    debug: userConfig?.debug ?? template.debug,
+    ligatures: new Set(template.ligatures),
+    ligaturesListedAreEnabled: template.ligaturesListedAreEnabled,
+    selectionMode: (userConfig?.selectionMode?.toLowerCase() ?? template.selectionMode) as SelectionMode,
+    ligaturesByContext: clone(template.ligaturesByContext)
+  };
+
+  if (!/^(cursor|line|off|selection)$/.test(internalConfig.selectionMode))
+    throw new Error('Invalid selectionMode');
+
+  setCompactScope(!!(userConfig?.compactScopeDisplay ?? template.compactScopeDisplay));
+
+  applyContextList(internalConfig.contexts, userConfig?.contexts);
+  internalConfig.ligaturesListedAreEnabled = applyLigatureList(internalConfig.ligatures, userConfig?.ligatures,
+    internalConfig.ligaturesListedAreEnabled);
+
+  const contextKeys = Object.keys(userConfig?.ligaturesByContext ?? {});
+
+  for (const key of contextKeys) {
+    const config = userConfig.ligaturesByContext[key];
+    const contexts = toStringArray(key, true);
+
+    if (contexts.length < 1)
+      continue;
+
+    const contextConfig = {
+      ligatures: new Set(internalConfig.ligatures),
+      ligaturesListedAreEnabled: internalConfig.ligaturesListedAreEnabled,
+    };
+
+    contextConfig.ligaturesListedAreEnabled = applyLigatureList(contextConfig.ligatures, config,
+      contextConfig.ligaturesListedAreEnabled);
+
+    contexts.forEach(context => {
+      internalConfig.ligaturesByContext[context] = contextConfig;
+      internalConfig.contexts.add(context);
+    });
+  }
 
   const allLigatures = Array.from(globalLigatures);
 
   allLigatures.sort((a, b) => b.length - a.length); // Sort from longest to shortest
   globalMatchLigatures = new RegExp(allLigatures.map(lg => lg.replace(escapeRegex, '\\$&')).join('|'), 'g');
+
+  if (!language)
+    defaultConfiguration = internalConfig;
+  else
+    configurationsByLanguage.set(language, internalConfig);
+
+  return internalConfig;
 }
 
 function toStringArray(s: string | string[], allowComma = false): string[] {
@@ -289,7 +290,7 @@ function toStringArray(s: string | string[], allowComma = false): string[] {
     return [];
 }
 
-function applyLigatureList(ligatureToDisable: Set<string>, specs: string | string[], listedAreEnabled = false): boolean {
+function applyLigatureList(ligatureList: Set<string>, specs: string | string[], listedAreEnabled = false): boolean {
   let addToList = false;
   let removeFromList = false;
 
@@ -302,12 +303,12 @@ function applyLigatureList(ligatureToDisable: Set<string>, specs: string | strin
       else if (spec === '-')
         addToList = !(removeFromList = listedAreEnabled);
       else if (spec === '0' || spec === 'O') {
-        ligatureToDisable.clear();
+        ligatureList.clear();
         addToList = listedAreEnabled = true;
         removeFromList = false;
       }
       else if (spec === 'X') {
-        ligatureToDisable.clear();
+        ligatureList.clear();
         addToList = true;
         removeFromList = listedAreEnabled = false;
       }
@@ -318,9 +319,9 @@ function applyLigatureList(ligatureToDisable: Set<string>, specs: string | strin
       globalLigatures.add(spec);
 
       if (addToList)
-        ligatureToDisable.add(spec);
+        ligatureList.add(spec);
       else if (removeFromList)
-        ligatureToDisable.delete(spec);
+        ligatureList.delete(spec);
     }
   });
 

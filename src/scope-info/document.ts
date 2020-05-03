@@ -88,14 +88,17 @@ export class DocumentController implements Disposable {
   private scopesToCategory(scopes: string[], text: string): string {
     if (scopes.length > 0) {
       let scope = last(scopes);
+      let parentScope = scopes[scopes.length - 2] ?? '';
 
-      if (/\b(invalid|illegal)\b/.test(scope) && scopes.length > 1)
-        scope = scopes[scopes.length - 2];
+      if (/\b(invalid|illegal|character\.escape)\b/.test(scope) && parentScope) {
+        scope = parentScope;
+        parentScope = scopes[scopes.length - 3] ?? '';
+      }
 
-      if (/\boperator|accessor|arrow|pointer-access|dot-access\b/.test(scope))
-        return 'operator';
-      else if (/^string\.regexp\b/.test(scope))
+      if (/^string\.regexp\b/.test(scope) || /^string\.regexp\b/.test(parentScope))
         return 'regexp';
+      else if (/\boperator|accessor|arrow|pointer-access|dot-access\b/.test(scope))
+        return 'operator';
       else if (/^string\b/.test(scope))
         return 'string';
       else if (/^punctuation\.definition\.comment\b/.test(scope))

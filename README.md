@@ -1,15 +1,4 @@
-### Disable Ligatures
+## Ligatures Limited
 
-A simple extension to disable ligatures for selected lines or cursor position
+### Ligatures only where you want them
 
-### Settings:  
-`"disableLigatures.mode": "Line"`  
-Disable all ligatures on the current line  
-![Line](img/line.png)
-
-`"disableLigatures.mode": "Cursor"`  
-Disable ligatures at cursor position  
-![Cursor](img/cursor.png)
-
-`"disableLigatures.ligatures"`  
-Choose which ligatures to disable
