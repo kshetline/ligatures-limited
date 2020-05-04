@@ -144,7 +144,7 @@ export class DocumentController implements Disposable {
       // Oddly some identifier in C++ aren't being identified by TextMate at all, only the scope in which
       // they are embedded. I'll treat those as variables if the text looks like a variable name.
       // Below is a fairly generous, but not exhaustive, regex for matching valid identifiers.
-      else if (/^(meta|source)\b/.test(scope) && /^[\p{L}$_·][\p{L}\p{M}\p{N}$_·]*$/u.test(text))
+      else if (/^(meta|source(?!\.ignore))\b/.test(scope) && /^[\p{L}$_·][\p{L}\p{M}\p{N}$_·]*$/u.test(text))
         return 'identifier';
     }
 

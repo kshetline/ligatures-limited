@@ -70,8 +70,7 @@ typings/
 *.launch
 .settings/
 *.sublime-workspace
-
-.vscode/*
+.vscode/
 
 # System Files
 .DS_Store
