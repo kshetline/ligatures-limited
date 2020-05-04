@@ -133,13 +133,13 @@
 		},
 		"commands": [
 			{
-				"command": "extension.enableScopeHover",
-				"title": "enable hover information",
+				"command": "extension.toggleScopeHover",
+				"title": "Toggle hover information",
 				"category": "ligatures-limited"
 			},
 			{
-				"command": "extension.disableScopeHover",
-				"title": "disable hover information",
+				"command": "extension.cycleLigatureDebug",
+				"title": "Cycle through the three modes of ligature debugging: by settings, all on, all off",
 				"category": "ligatures-limited"
 			}
 		]

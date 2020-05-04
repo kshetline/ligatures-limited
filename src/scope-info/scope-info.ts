@@ -1,10 +1,10 @@
 import { DocumentController, ScopeInfoAPI, Token } from './document';
+import { registerCommand, toast } from '../extension-util';
 import fs from 'fs';
 import * as oniguruma from 'vscode-oniguruma-wasm';
 import { join } from 'path';
 import {
-  commands, Disposable, ExtensionContext, Extension, extensions, Hover, languages, Memento,
-  Position, TextDocument, Uri, workspace
+  Disposable, ExtensionContext, Extension, extensions, Hover, languages, Position, TextDocument, Uri, workspace
 } from 'vscode';
 import { IGrammar, IRawGrammar, parseRawGrammar, Registry, RegistryOptions } from 'vscode-textmate';
 
@@ -136,17 +136,8 @@ async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
   }));
 }
 
-export let workspaceState: Memento;
-
 export function activate(context: ExtensionContext): ScopeInfoAPI {
-  workspaceState = context.workspaceState;
-
-  function registerCommand(commandId: string, run: (...args: any[]) => void): void {
-    context.subscriptions.push(commands.registerCommand(commandId, run));
-  }
-
-  registerCommand('extension.disableScopeHover', disableScopeHover);
-  registerCommand('extension.enableScopeHover', enableScopeHover);
+  registerCommand(context, 'extension.toggleScopeHover', toggleScopeHover);
   context.subscriptions.push(workspace.onDidOpenTextDocument(openDocument));
   context.subscriptions.push(workspace.onDidCloseTextDocument(closeDocument));
   provideHoverInfo(context.subscriptions);
@@ -211,14 +202,10 @@ export function reloadGrammar(): void {
     openDocument(doc);
 }
 
-function disableScopeHover(): void {
-  setHover(false);
+function toggleScopeHover(): void {
+  hoverEnabled = !hoverEnabled;
+  toast('Scope info on hover: ' + (hoverEnabled ? 'on' : 'off'));
   unloadDocuments();
-}
-
-function enableScopeHover(): void {
-  setHover(true);
-  reloadGrammar();
 }
 
 function loadGrammar(scopeName: string): Promise<IGrammar> {

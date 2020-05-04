@@ -1,4 +1,5 @@
 import { getLigatureMatcher, resetConfiguration, readConfiguration } from './configuration';
+import { registerCommand, toast } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection } from 'vscode';
@@ -7,9 +8,13 @@ const breakNormal = window.createTextEditorDecorationType({ color: '' });
 const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: 'white' });
 const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: 'white' });
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
+let globalDebug: boolean = null;
+let currentDocument: TextDocument;
 
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
+
+  registerCommand(context, 'extension.cycleLigatureDebug', cycleDebug);
 
   workspace.onDidChangeConfiguration(() => {
     resetConfiguration();
@@ -44,6 +49,20 @@ export function activate(context: ExtensionContext): void {
     workspace.textDocuments.forEach(document => reviewDocument(document));
   }
 
+  function cycleDebug(): void {
+    if (globalDebug == null)
+      globalDebug = true;
+    else if (globalDebug)
+      globalDebug = false;
+    else
+      globalDebug = null;
+
+    toast('Ligature debug highlighting: ' + (globalDebug == null ? 'by settings' : (globalDebug ? 'all on' : 'all off')));
+
+    if (currentDocument)
+      reviewDocument(currentDocument);
+  }
+
   function reviewDocument(document: TextDocument, attempt = 1): void {
     if (attempt > 5)
       return;
@@ -52,6 +71,8 @@ export function activate(context: ExtensionContext): void {
 
     if (!isValidDocument(document) || !editors)
       return;
+
+    currentDocument = document;
 
     if (!scopeInfoApi.getScopeAt(document, new Position(0, 0))) {
       setTimeout(() => reviewDocument(document, ++attempt), 250);
@@ -110,7 +131,7 @@ export function activate(context: ExtensionContext): void {
           (langConfig.ligaturesByContext[specificScope] ?? langConfig.ligaturesByContext[category]));
         const contextLigatures = contextConfig?.ligatures ?? langLigatures;
         const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
-        const debug = contextConfig?.debug ?? langConfig.debug;
+        const debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
 
         if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !contexts.has(category)) {
           for (let j = 0; j < ligature.length; ++j)
