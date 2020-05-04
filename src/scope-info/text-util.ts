@@ -114,7 +114,7 @@ export function rangeContains(range: Range, pos: Position, exclStart = false, in
 export function maxPosition(x: Position, y: Position): Position {
   if (x.line < y.line)
     return x;
-  else if (x.line < x.line)
+  else if (y.line < x.line)
     return y;
   else if (x.character < y.character)
     return x;

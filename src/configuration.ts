@@ -46,7 +46,7 @@ const configurationsByLanguage = new Map<string, InternalConfig>();
 let globalLigatures: Set<string>;
 let globalMatchLigatures: RegExp;
 
-const escapeRegex = /[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g;
+const escapeRegex = /[-[\]/{}()*+?.\\^$|]/g;
 
 export function resetConfiguration(): void {
   defaultConfiguration = undefined;
@@ -87,7 +87,7 @@ export function readConfiguration(language?: string, loopCheck = new Set<string>
     }
 
     if (languageConfig) {
-      const config = languageConfig['ligaturesLimited'] || {};
+      const config = languageConfig.ligaturesLimited || {};
 
       config.compactScopeDisplay = languageConfig[`${prefix}compactScopeDisplay`] ?? config.compactScopeDisplay;
       config.contexts = languageConfig[`${prefix}contexts`] ?? config.contexts;

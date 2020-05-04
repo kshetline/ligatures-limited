@@ -161,7 +161,7 @@ export class DocumentController implements Disposable {
     let lineIdx;
     for (lineIdx = range.start.line; lineIdx <= range.end.line || (invalidatedTokenState && lineIdx < lineCount); ++lineIdx) {
       const line = this.document.lineAt(lineIdx);
-      const { tokens: tokens, invalidated: invalidated } = this.refreshTokensOnLine(line);
+      const { invalidated } = this.refreshTokensOnLine(line);
       invalidatedTokenState = invalidated;
     }
   }
@@ -175,7 +175,8 @@ export class DocumentController implements Disposable {
         const editRange = textUtil.rangeDeltaNewRange(delta);
 
         this.reparsePretties(editRange);
-      } catch (e) {
+      }
+      catch (e) {
         console.error(e);
       }
     }

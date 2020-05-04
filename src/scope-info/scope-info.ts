@@ -69,8 +69,8 @@ async function getLanguageGrammar(scopeName: string): Promise<IRawGrammar> {
     const extLanguages =
       extensions.all
         .filter(x => x.packageJSON && x.packageJSON.contributes && x.packageJSON.contributes.grammars)
-        .reduce((a: GrammarAndExtensionPath[], b) => [...a,
-        ...groupGrammarsAndPath((b.packageJSON as ExtensionPackage).contributes.grammars, b)], []);
+        .reduce((a: GrammarAndExtensionPath[], b) =>
+          [...a, ...groupGrammarsAndPath((b.packageJSON as ExtensionPackage).contributes.grammars, b)], []);
     const matchingLanguages = extLanguages.filter(g => g.grammar.scopeName === scopeName);
 
     if (matchingLanguages.length > 0) {
@@ -204,7 +204,6 @@ export function reloadGrammar(): void {
   for (const doc of workspace.textDocuments)
     openDocument(doc);
 }
-
 
 function disableScopeHover(): void {
   setHover(false);

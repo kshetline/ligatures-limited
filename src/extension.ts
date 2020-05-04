@@ -62,7 +62,7 @@ export function activate(context: ExtensionContext): void {
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
-      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = []): void {
+    breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = []): void {
     if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
       return;
 
@@ -94,7 +94,8 @@ export function activate(context: ExtensionContext): void {
           ligature = ligature.substr(0, scope.text.length);
         }
 
-        if (selectionMode !== 'off' && editor.selections?.length > 0 && (isInsert(editor.selections) || selectionMode !== 'cursor')) {
+        if (selectionMode !== 'off' && editor.selections?.length > 0 &&
+            (isInsert(editor.selections) || selectionMode !== 'cursor')) {
           const range = selectionMode === 'line' ?
             new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
 
