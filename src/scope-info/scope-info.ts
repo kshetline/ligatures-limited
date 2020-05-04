@@ -100,7 +100,7 @@ async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
       .filter(x => getLanguageScopeName(x) !== undefined);
 
   subscriptions.push(languages.registerHoverProvider(allLanguages, {
-    provideHover: (doc, pos): Hover => {
+    provideHover: (doc: { uri: Uri; }, pos: Position): Hover => {
       if (!isHoverEnabled())
         return;
 

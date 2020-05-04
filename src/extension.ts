@@ -95,7 +95,7 @@ export function activate(context: ExtensionContext): void {
         }
 
         if (selectionMode !== 'off' && editor.selections?.length > 0 &&
-            (isInsert(editor.selections) || selectionMode !== 'cursor')) {
+            (isInsert(editor.selections, i, index, ligature.length) || selectionMode !== 'cursor')) {
           const range = selectionMode === 'line' ?
             new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
 
@@ -149,8 +149,15 @@ function getEditors(document: TextDocument): TextEditor[] {
   return editors.length > 0 ? editors : undefined;
 }
 
-function isInsert(selections: Selection[]): boolean {
-  return selections && selections.length === 1 && selections[0].start.isEqual(selections[0].end);
+function isInsert(selections: Selection[], line: number, index: number, length: number): boolean {
+  if (selections && selections.length === 1) {
+    const s = selections[0].start;
+    const e = selections[0].end;
+
+    return (s.isEqual(e) || (s.line === line && e.line === line && s.character >= index && e.character <= index + length));
+  }
+
+  return false;
 }
 
 export function deactivate(): void {
