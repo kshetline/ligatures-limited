@@ -7,6 +7,7 @@ const path = require('path');
 /** @type {import('webpack').Configuration} */
 const config = {
   target: 'node',
+  node: false,
 
   entry: './src/extension.ts', // the entry point of this extension
   output: {
@@ -27,13 +28,10 @@ const config = {
       {
         test: /\.ts$/,
         exclude: /node_modules/,
-        use: [
-          {
-            loader: 'ts-loader'
-          }
-        ]
+        use: 'ts-loader'
       }
     ]
   }
 };
+
 module.exports = config;

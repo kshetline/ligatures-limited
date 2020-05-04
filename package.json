@@ -20,7 +20,7 @@
 		"ligatures",
 		"scope"
 	],
-	"main": "./out/src/extension",
+	"main": "./dist/extension",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/kshetline/ligatures-limited.git"

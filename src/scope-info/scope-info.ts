@@ -10,7 +10,13 @@ import { IGrammar, IRawGrammar, parseRawGrammar, Registry, RegistryOptions } fro
 
 const documents = new Map<Uri, DocumentController>();
 const cachedGrammars = new Map<string, IGrammar | Promise<IGrammar>>();
-const wasm = fs.readFileSync(join(__dirname, '../../../node_modules/vscode-oniguruma-wasm/release/onig.wasm')).buffer;
+const baseOnigPath = 'node_modules/vscode-oniguruma-wasm/release/onig.wasm';
+let onigPath = join(__dirname, '../../..', baseOnigPath);
+
+if (!fs.existsSync(onigPath))
+  onigPath = join(__dirname, '..', baseOnigPath);
+
+const wasm = fs.readFileSync(onigPath).buffer;
 
 oniguruma.loadWASM(wasm);
 
