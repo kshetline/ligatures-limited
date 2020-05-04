@@ -27,7 +27,10 @@
 	},
 	"license": "MIT",
 	"scripts": {
-		"vscode:prepublish": "tsc -p ./",
+		"vscode:prepublish": "webpack --mode production",
+		"webpack": "webpack --mode development",
+		"webpack-dev": "webpack --mode development --watch",
+		"test-compile": "tsc -p ./",
 		"compile": "tsc -watch -p ./",
 		"postinstall": "node ./node_modules/vscode/bin/install",
 		"lint": "eslint \"**/*.ts\""
@@ -54,8 +57,11 @@
 		"eslint-plugin-promise": "^4.2.1",
 		"eslint-plugin-standard": "^4.0.1",
 		"mocha": "^7.1.2",
+		"ts-loader": "^7.0.2",
 		"typescript": "^3.8.3",
-		"vscode": "^1.1.37"
+		"vscode": "^1.1.37",
+		"webpack": "^4.43.0",
+		"webpack-cli": "^3.3.11"
 	},
 	"contributes": {
 		"configuration": {
