@@ -205,7 +205,6 @@ export function reloadGrammar(): void {
 function toggleScopeHover(): void {
   hoverEnabled = !hoverEnabled;
   toast('Scope info on hover: ' + (hoverEnabled ? 'on' : 'off'));
-  unloadDocuments();
 }
 
 function loadGrammar(scopeName: string): Promise<IGrammar> {

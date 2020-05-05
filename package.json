@@ -6,7 +6,7 @@
 	"author": "Kerry Shetline",
 	"publisher": "kshetline",
 	"engines": {
-		"vscode": "^1.44.0"
+		"vscode": "^1.5.0"
 	},
 	"categories": [
 		"Other"
@@ -31,7 +31,7 @@
 		"webpack": "webpack --mode development",
 		"webpack-dev": "webpack --mode development --watch",
 		"test-compile": "tsc -p ./",
-		"compile": "tsc -watch -p ./",
+		"compile": "copyfiles -f dev/extension.js dist && tsc -p ./",
 		"postinstall": "node ./node_modules/vscode/bin/install",
 		"lint": "eslint \"**/*.ts\""
 	},
@@ -45,9 +45,9 @@
 		"@types/mocha": "^7.0.2",
 		"@types/node": "^13.13.4",
 		"@types/oniguruma": "^7.0.1",
-		"@types/vscode": "^1.44.0",
-		"@typescript-eslint/eslint-plugin": "^2.30.0",
-		"@typescript-eslint/parser": "^2.30.0",
+		"@typescript-eslint/eslint-plugin": "^2.31.0",
+		"@typescript-eslint/parser": "^2.31.0",
+		"copyfiles": "^2.2.0",
 		"eslint": "^6.8.0",
 		"eslint-config-standard": "^14.1.1",
 		"eslint-plugin-chai-friendly": "^0.6.0",

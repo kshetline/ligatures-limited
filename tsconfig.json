@@ -25,6 +25,8 @@
   "exclude": [
     "node_modules",
     "out",
+    "dev",
+    "dist",
     ".vscode-test",
     "test",
     "test/test_files"

@@ -3,6 +3,7 @@ node_modules
 src/
 test/
 out/
+dev/
 tsconfig.json
 webpack.config.js
 **/*.mp

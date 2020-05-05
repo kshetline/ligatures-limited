@@ -35,11 +35,18 @@ export interface InternalConfig {
 const baseLigatures = String.raw`.= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
   '=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
   '<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
-  ';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl
+  ';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0x
   '-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_('`.split(/\s+/);
 
 const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl']);
-const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation']);
+const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
+const baseLigaturesByContext = {
+  number: {
+    debug: false,
+    ligatures: new Set(['0x']),
+    ligaturesListedAreEnabled: true
+  }
+};
 
 let defaultConfiguration: InternalConfig;
 const configurationsByLanguage = new Map<string, InternalConfig>();
@@ -136,7 +143,7 @@ export function readConfiguration(language?: string, loopCheck = new Set<string>
       ligatures: new Set(baseDisabledLigatures),
       ligaturesListedAreEnabled: false,
       selectionMode: 'cursor' as SelectionMode,
-      ligaturesByContext: {}
+      ligaturesByContext: baseLigaturesByContext
     };
   }
 
