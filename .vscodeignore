@@ -4,6 +4,7 @@ src/
 test/
 out/
 dev/
+img/*.jpg
 tsconfig.json
 webpack.config.js
 **/*.mp
