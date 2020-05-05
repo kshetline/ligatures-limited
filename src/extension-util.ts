@@ -9,3 +9,7 @@ export function registerCommand(context: ExtensionContext, commandId: string, ru
 export function toast(message: string): void {
   window.setStatusBarMessage(message, TOAST_TIMEOUT);
 }
+
+export function showInfoMessage(message: string): void {
+  window.showInformationMessage(message);
+}

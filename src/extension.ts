@@ -1,5 +1,5 @@
 import { getLigatureMatcher, resetConfiguration, readConfiguration, SelectionMode } from './configuration';
-import { registerCommand, toast } from './extension-util';
+import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
@@ -63,7 +63,7 @@ export function activate(context: ExtensionContext): void {
     else
       globalDebug = null;
 
-    toast('Ligature debug highlighting: ' + (globalDebug == null ? 'by settings' : (globalDebug ? 'all on' : 'all off')));
+    showInfoMessage('Ligature debug highlighting: ' + (globalDebug == null ? 'by settings' : (globalDebug ? 'all on' : 'all off')));
 
     if (currentDocument)
       reviewDocument(currentDocument);
@@ -72,7 +72,7 @@ export function activate(context: ExtensionContext): void {
   function cycleSelectionMode(): void {
     selectionModeOverride = selectionModes[(Math.max(selectionModes.indexOf(selectionModeOverride), 0) + 1) % selectionModes.length];
 
-    toast('Ligature selection disable mode: ' + (selectionModeOverride ?? 'by settings'));
+    showInfoMessage('Ligature selection disable mode: ' + (selectionModeOverride ?? 'by settings'));
 
     if (currentDocument)
       reviewDocument(currentDocument);
@@ -80,7 +80,8 @@ export function activate(context: ExtensionContext): void {
 
   function toggleLigatures(): void {
     ligatureSuppression = !ligatureSuppression;
-    toast('Ligature suppression: ' + (ligatureSuppression ? 'active' : 'inactive'));
+    showInfoMessage('Ligature suppression by Ligatures Limited has been ' +
+      (ligatureSuppression ? 'activated' : 'deactivated'));
 
     if (currentDocument)
       reviewDocument(currentDocument);

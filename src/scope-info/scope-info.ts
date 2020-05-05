@@ -1,5 +1,5 @@
 import { DocumentController, ScopeInfoAPI, Token } from './document';
-import { registerCommand, toast } from '../extension-util';
+import { registerCommand, showInfoMessage } from '../extension-util';
 import fs from 'fs';
 import * as oniguruma from 'vscode-oniguruma-wasm';
 import { join } from 'path';
@@ -204,7 +204,7 @@ export function reloadGrammar(): void {
 
 function toggleScopeHover(): void {
   hoverEnabled = !hoverEnabled;
-  toast('Scope info on hover: ' + (hoverEnabled ? 'on' : 'off'));
+  showInfoMessage('Scope info on hover: ' + (hoverEnabled ? 'on' : 'off'));
 }
 
 function loadGrammar(scopeName: string): Promise<IGrammar> {
