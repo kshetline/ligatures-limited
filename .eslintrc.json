@@ -50,7 +50,9 @@
         "ArrayExpression": "first",
         "ignoredNodes": [
           "IfStatement > :expression *",
-          "WhileStatement > :expression *"
+          "WhileStatement > :expression *",
+          "FunctionDeclaration > AssignmentPattern",
+          "FunctionDeclaration > Identifier"
         ],
         "ObjectExpression": "first",
         "SwitchCase": 1

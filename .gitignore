@@ -71,7 +71,9 @@ typings/
 *.launch
 .settings/
 *.sublime-workspace
-.vscode/
+.vscode
+!.vscode/launch.json
+!.vscode/tasks.json
 
 # System Files
 .DS_Store

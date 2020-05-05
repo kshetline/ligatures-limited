@@ -1,24 +1,30 @@
-import { getLigatureMatcher, resetConfiguration, readConfiguration } from './configuration';
+import { getLigatureMatcher, resetConfiguration, readConfiguration, SelectionMode } from './configuration';
 import { registerCommand, toast } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
-import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection } from 'vscode';
+import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
 
 const breakNormal = window.createTextEditorDecorationType({ color: '' });
-const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: 'white' });
-const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: 'white' });
+const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
+const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: new ThemeColor('editor.foreground') });
+const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
 let globalDebug: boolean = null;
+let selectionModeOverride: SelectionMode = null;
+const selectionModes: SelectionMode[] = [null, 'off', 'cursor', 'line', 'selection'];
 let currentDocument: TextDocument;
+let ligatureSuppression = true;
 
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
 
   registerCommand(context, 'extension.cycleLigatureDebug', cycleDebug);
+  registerCommand(context, 'extension.cycleSelectionMode', cycleSelectionMode);
+  registerCommand(context, 'extension.toggleLigatureSuppression', toggleLigatures);
 
   workspace.onDidChangeConfiguration(() => {
     resetConfiguration();
-    readConfiguration();
+    selectionModeOverride = readConfiguration().selectionMode;
     reloadGrammar();
     init();
   }, null, context.subscriptions);
@@ -42,7 +48,7 @@ export function activate(context: ExtensionContext): void {
     reviewDocument(document);
   });
 
-  readConfiguration();
+  selectionModeOverride = readConfiguration().selectionMode;
   init();
 
   function init(): void {
@@ -58,6 +64,23 @@ export function activate(context: ExtensionContext): void {
       globalDebug = null;
 
     toast('Ligature debug highlighting: ' + (globalDebug == null ? 'by settings' : (globalDebug ? 'all on' : 'all off')));
+
+    if (currentDocument)
+      reviewDocument(currentDocument);
+  }
+
+  function cycleSelectionMode(): void {
+    selectionModeOverride = selectionModes[(Math.max(selectionModes.indexOf(selectionModeOverride), 0) + 1) % selectionModes.length];
+
+    toast('Ligature selection disable mode: ' + (selectionModeOverride ?? 'by settings'));
+
+    if (currentDocument)
+      reviewDocument(currentDocument);
+  }
+
+  function toggleLigatures(): void {
+    ligatureSuppression = !ligatureSuppression;
+    toast('Ligature suppression: ' + (ligatureSuppression ? 'active' : 'inactive'));
 
     if (currentDocument)
       reviewDocument(currentDocument);
@@ -83,86 +106,93 @@ export function activate(context: ExtensionContext): void {
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
-    breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = []): void {
+      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = []): void {
     if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
       return;
 
-    const started = processMillis();
-    const langConfig = readConfiguration(document.languageId);
-    const selectionMode = langConfig.selectionMode;
-    const langLigatures = langConfig.ligatures;
-    const contexts = langConfig.contexts;
-    const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
-    const matcher = getLigatureMatcher();
+    const background: Range[] = [];
 
-    for (let i = first; i <= last; ++i) {
-      const line = document.lineAt(i).text;
-      let match: RegExpExecArray;
+    if (ligatureSuppression) {
+      const started = processMillis();
+      const langConfig = readConfiguration(document.languageId);
+      const selectionMode = selectionModeOverride ?? langConfig.selectionMode;
+      const langLigatures = langConfig.ligatures;
+      const contexts = langConfig.contexts;
+      const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
+      const matcher = getLigatureMatcher();
 
-      while ((match = matcher.exec(line))) {
-        const index = match.index;
-        let ligature = match[0];
-        let selected = false;
-        let shortened = false;
-        const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
-        let category = scope.category;
-        let extraLength = 0;
-        const specificScope = _last(scope.scopes);
+      for (let i = first; i <= last; ++i) {
+        const line = document.lineAt(i).text;
+        let match: RegExpExecArray;
 
-        // Did the matched ligature overshoot a token boundary?
-        if (ligature.length > scope.text.length && !bleedThroughs.has(ligature)) {
-          shortened = true;
-          matcher.lastIndex -= ligature.length - scope.text.length;
-          ligature = ligature.substr(0, scope.text.length);
-        }
+        while ((match = matcher.exec(line))) {
+          const index = match.index;
+          let ligature = match[0];
+          let selected = false;
+          let shortened = false;
+          const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
+          let category = scope.category;
+          let extraLength = 0;
+          const specificScope = _last(scope.scopes);
 
-        // Treat 0b, 0o, and 0x as special cases: they might be the lead-in to a numeric constant,
-        // but treated as a separate keyword.
-        if (/^0[box]$/.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
-          const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
-
-          if (nextScope.category === 'number') {
-            category = 'number';
-            ++matcher.lastIndex;
-            extraLength = 1;
+          // Did the matched ligature overshoot a token boundary?
+          if (ligature.length > scope.text.length && !bleedThroughs.has(ligature)) {
+            shortened = true;
+            matcher.lastIndex -= ligature.length - scope.text.length;
+            ligature = ligature.substr(0, scope.text.length);
           }
-        }
 
-        if (selectionMode !== 'off' && editor.selections?.length > 0 &&
-            (isInsert(editor.selections, i, index, ligature.length) || selectionMode !== 'cursor')) {
-          const range = selectionMode === 'line' ?
-            new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
+          // Treat 0b, 0o, and 0x as special cases: they might be the lead-in to a numeric constant,
+          // but treated as a separate keyword.
+          if (/^0[box]$/.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
+            const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
 
-          for (let j = 0; j < editor.selections.length && !selected; ++j) {
-            const selection = editor.selections[j];
-
-            selected = !!selection.intersection(range);
+            if (nextScope.category === 'number') {
+              category = 'number';
+              ++matcher.lastIndex;
+              extraLength = 1;
+            }
           }
+
+          if (selectionMode !== 'off' && editor.selections?.length > 0 &&
+              (isInsert(editor.selections, i, index, ligature.length) || selectionMode !== 'cursor')) {
+            const range = selectionMode === 'line' ?
+              new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
+
+            for (let j = 0; j < editor.selections.length && !selected; ++j) {
+              const selection = editor.selections[j];
+
+              selected = !!selection.intersection(range);
+            }
+          }
+
+          const contextConfig = (langConfig.ligaturesByContext &&
+            (langConfig.ligaturesByContext[specificScope] ?? langConfig.ligaturesByContext[category]));
+          const contextLigatures = contextConfig?.ligatures ?? langLigatures;
+          const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
+          const debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
+
+          if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !contexts.has(category)) {
+            for (let j = 0; j < ligature.length + extraLength; ++j)
+              (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
+          }
+          else if (debug)
+            highlights.push(new Range(i, index, i, index + ligature.length + extraLength));
         }
 
-        const contextConfig = (langConfig.ligaturesByContext &&
-          (langConfig.ligaturesByContext[specificScope] ?? langConfig.ligaturesByContext[category]));
-        const contextLigatures = contextConfig?.ligatures ?? langLigatures;
-        const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
-        const debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
-
-        if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !contexts.has(category)) {
-          for (let j = 0; j < ligature.length + extraLength; ++j)
-            (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
+        if (processMillis() > started + 50_000_000) {
+          setTimeout(() => lookForLigatures(document, editor, i + 1, last, breaks, debugBreaks, highlights), 50);
+          return;
         }
-        else if (debug)
-          highlights.push(new Range(i, index, i, index + ligature.length + extraLength));
-      }
-
-      if (processMillis() > started + 50_000_000) {
-        setTimeout(() => lookForLigatures(document, editor, i + 1, last, breaks, debugBreaks, highlights), 50);
-        return;
       }
     }
+    else
+      background.push(new Range(0, 0, last + 1, 0));
 
     editor.setDecorations(breakNormal, breaks);
     editor.setDecorations(breakDebug, debugBreaks);
     editor.setDecorations(highlightLigature, highlights);
+    editor.setDecorations(allLigatures, background);
   }
 }
 

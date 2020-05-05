@@ -1,15 +1,11 @@
 {
     "version": "2.0.0",
-    "presentation": {
-        "revealProblems": "always"
-    },
-    "isBackground": true,
     "problemMatcher": "$tsc-watch",
     "tasks": [
-        {
-            "label": "npm",
-            "type": "npm",
-            "script": "compile"
-        }
+      {
+        "label": "npm",
+        "type": "npm",
+        "script": "compile"
+      }
     ]
 }

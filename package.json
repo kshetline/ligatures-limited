@@ -83,7 +83,7 @@
 				"ligaturesLimited.debug": {
 					"type": "boolean",
 					"default": false,
-					"description": "Highlight disabled and enabled ligatures (works best in dark mode).",
+					"description": "Highlight disabled and enabled ligatures.",
 					"language-overridable": true
 				},
 				"ligaturesLimited.languages": {
@@ -140,6 +140,16 @@
 			{
 				"command": "extension.cycleLigatureDebug",
 				"title": "Cycle through the three modes of ligature debugging: by settings, all on, all off",
+				"category": "ligatures-limited"
+			},
+			{
+				"command": "extension.cycleSelectionMode",
+				"title": "Cycle through the five modes of disabling ligatures by selection: by settings, off, cursor, line, full selection",
+				"category": "ligatures-limited"
+			},
+			{
+				"command": "extension.toggleLigatureSuppression",
+				"title": "Toggle suppression of ligatures",
 				"category": "ligatures-limited"
 			}
 		]
