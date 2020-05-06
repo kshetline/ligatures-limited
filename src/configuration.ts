@@ -7,6 +7,7 @@ interface LLConfiguration {
   compactScopeDisplay?: boolean;
   contexts?: string | string[];
   debug?: boolean;
+  disregardedLigatures: string | string[];
   inherit?: string;
   languages: Record<string, LLConfiguration>;
   ligatures?: string | string[];
@@ -131,8 +132,12 @@ export function readConfiguration(language?: string, loopCheck = new Set<string>
       }
     }
   }
-  else
+  else {
+    const disregarded = toStringArray(workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures'));
+
     globalLigatures = new Set(baseLigatures);
+    disregarded.forEach(l => globalLigatures.delete(l));
+  }
 
   if (!userConfig) {
     userConfig = workspace.getConfiguration().get('ligaturesLimited');
@@ -265,7 +270,7 @@ function applyLigatureList(ligatureList: Set<string>, specs: string | string[], 
 }
 
 function applyContextList(contextsToEnable: Set<string>, specs: string | string[]): void {
-  let enable = false;
+  let enable = true;
 
   toStringArray(specs, true).forEach(spec => {
     if (spec.length === 1) {

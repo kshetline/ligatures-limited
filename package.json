@@ -60,26 +60,46 @@
 					"description": "Highlight disabled and enabled ligatures.",
 					"language-overridable": true
 				},
+				"ligaturesLimited.disregardedLigatures": {
+					"type": "string",
+					"description": "Ligatures which should be ignored — neither actively suppressed nor enabled.",
+					"language-overridable": true
+				},
 				"ligaturesLimited.languages": {
 					"type": "object",
 					"description": "Language-specific rules",
-					"properties": {
-						"contexts": {
-							"type": "string"
-						},
-						"debug": {
-							"type": "boolean"
-						},
-						"inherit": {
-							"type": "string",
-							"description": "For language-specific settings, a language ID to for that language to inherit from.",
-							"language-overridable": true
-						},
-						"ligaturesByContext": {
-							"type": "object",
-							"description": "Context-specific rules",
-							"additionalProperties": {
-								"type": "object"
+					"additionalProperties": {
+						"type": "object",
+						"properties": {
+							"contexts": {
+								"type": "string"
+							},
+							"debug": {
+								"type": "boolean"
+							},
+							"inherit": {
+								"type": "string",
+								"description": "For language-specific settings, a language ID to for that language to inherit from.",
+								"language-overridable": true
+							},
+							"ligaturesByContext": {
+								"type": "object",
+								"description": "Context-specific rules",
+								"additionalProperties": {
+									"type": "object",
+									"properties": {
+										"debug": {
+											"type": "boolean",
+											"default": false,
+											"description": "Highlight disabled and enabled ligatures.",
+											"language-overridable": true
+										},
+										"ligatures": {
+											"type": "string",
+											"description": "Ligatures to enable or disable in this context."
+										}
+									}
+								}
 							}
 						}
 					}
@@ -129,11 +149,6 @@
 		},
 		"commands": [
 			{
-				"command": "extension.toggleScopeHover",
-				"title": "Toggle hover information",
-				"category": "ligatures-limited"
-			},
-			{
 				"command": "extension.cycleLigatureDebug",
 				"title": "Cycle through the three modes of ligature debugging: by settings, all on, all off",
 				"category": "ligatures-limited"
@@ -146,6 +161,11 @@
 			{
 				"command": "extension.toggleLigatureSuppression",
 				"title": "Toggle suppression of ligatures",
+				"category": "ligatures-limited"
+			},
+			{
+				"command": "extension.toggleScopeHover",
+				"title": "Toggle Ligatures Limited hover information",
 				"category": "ligatures-limited"
 			}
 		],

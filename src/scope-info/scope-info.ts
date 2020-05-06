@@ -1,3 +1,9 @@
+// The code below, and elsewhere in this same scope-info directory, heavily
+// borrows from https://github.com/siegebell/scope-info, by C. J. Bell.
+//
+// This extension also replicates and augments the hover information provided
+// by the original scope-info.
+
 import { DocumentController, ScopeInfoAPI, Token } from './document';
 import { registerCommand, showInfoMessage } from '../extension-util';
 import fs from 'fs';
