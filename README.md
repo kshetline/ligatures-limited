@@ -53,7 +53,7 @@ Fira Code again, but with all ligatures suppressed
 
 * toggleScopeHover
 
-  This command, available as a right-click contextual menu in the text editor, turns extra hover information on and off for your code. This information shows you *Ligatures Limited* token _category_ (described below) and TextMate scope information. This information is useful for deciding custom settings you might wish to apply.
+  This command, available as a right-click contextual menu in the text editor, turns extra hover information on and off for your code. This information shows you a *Ligatures Limited* token _category_ (described below) and TextMate scope information. This information is useful for deciding upon custom settings you might wish to apply.
 
 ## Custom settings
 
@@ -61,7 +61,7 @@ In lieu of a long-winded explanation of custom settings, for now I’ll just pro
 
 ### Contexts
 
-A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type.ts`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the type of language token the ligature is embedded within, and then applying the rules from your settings.
+A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type.ts`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the type of language token within which the ligature is embedded, and then applying the rules from your settings.
 
 ```text
 attribute_name  comment         comment_marker  constant        function
@@ -71,7 +71,13 @@ scope           string          tag             text            type
 variable
 ```
 
-The rules for how *Ligatures Limited* handles ligatures can be summed up by the way you answer the question: “Which ligatures do I want to see, and which do I want suppressed, in which scopes and in which languages?”
+The rules for how *Ligatures Limited* handles ligatures can be summed up by the way you answer the question: “Which ligatures do I want to see, and which do I want suppressed, in which contexts and in which languages?”
+
+### By-language and by-context settings
+
+A language specifier can be a comma-separated list of languages, and a context specifier for by-context rules can be a comma-separated list of contexts.
+
+Rules for a language can be inherited from rules for another language by using the `inherit` setting.
 
 ### Rules hierarchy
 
