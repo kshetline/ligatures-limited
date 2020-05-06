@@ -3,7 +3,7 @@
 	"version": "1.0.0-beta",
 	"publisher": "kshetline",
 	"engines": {
-		"vscode": "^1.5.0"
+		"vscode": "^1.44.0"
 	},
 	"license": "MIT",
 	"displayName": "Ligatures Limited",
@@ -25,8 +25,10 @@
 	"preview": true,
 	"main": "./dist/extension",
 	"contributes": {
+		"configurationDefaults": {
+			"editor.fontLigatures": true
+		},
 		"configuration": {
-			"type": "object",
 			"title": "Ligatures Limited",
 			"properties": {
 				"ligaturesLimited.compactScopeDisplay": {
@@ -37,8 +39,19 @@
 				},
 				"ligaturesLimited.contexts": {
 					"type": "string",
-					"default": null,
-					"markDownDescription": "List of contexts (token category or token scope) in which ligatures should be enabled.",
+					"markDownDescription": "Space-separated list of contexts (token category or token scope) in which ligatures should be enabled.",
+					"properties": {
+						"debug": {
+							"type": "boolean",
+							"default": false,
+							"description": "Highlight disabled and enabled ligatures.",
+							"language-overridable": true
+						},
+						"ligatures": {
+							"type": "string",
+							"description": "Ligatures to enable or disable in this context."
+						}
+					},
 					"language-overridable": true
 				},
 				"ligaturesLimited.debug": {
@@ -49,26 +62,52 @@
 				},
 				"ligaturesLimited.languages": {
 					"type": "object",
-					"default": null,
 					"description": "Language-specific rules",
 					"properties": {
 						"contexts": {
-							"type": "string",
-							"default": null
+							"type": "string"
 						},
 						"debug": {
-							"type": "boolean",
-							"default": null
+							"type": "boolean"
 						},
 						"inherit": {
 							"type": "string",
-							"default": null,
 							"description": "For language-specific settings, a language ID to for that language to inherit from.",
 							"language-overridable": true
+						},
+						"ligaturesByContext": {
+							"type": "object",
+							"description": "Context-specific rules",
+							"additionalProperties": {
+								"type": "object"
+							}
 						}
 					}
 				},
-				"ligaturesLimited.ligaturesByContext": {},
+				"ligaturesLimited.ligatures": {
+					"type": "string",
+					"description": "Ligatures to enable or disable globally.",
+					"language-overridable": true
+				},
+				"ligaturesLimited.ligaturesByContext": {
+					"type": "object",
+					"description": "Context-specific rules",
+					"additionalProperties": {
+						"type": "object",
+						"properties": {
+							"debug": {
+								"type": "boolean",
+								"default": false,
+								"description": "Highlight disabled and enabled ligatures.",
+								"language-overridable": true
+							},
+							"ligatures": {
+								"type": "string",
+								"description": "Ligatures to enable or disable in this context."
+							}
+						}
+					}
+				},
 				"ligaturesLimited.selectionMode": {
 					"enum": [
 						"off",
@@ -86,10 +125,6 @@
 					"description": "Option to disable ligatures at the current cursor position, current line, or within the current selection.",
 					"language-overridable": true
 				}
-			},
-			"configurationDefaults": {
-				"editor.fontLigatures": true,
-				"editor.fontFamily": "'Fira Code', Consolas, 'Courier New', monospace"
 			}
 		},
 		"commands": [
@@ -113,7 +148,14 @@
 				"title": "Toggle suppression of ligatures",
 				"category": "ligatures-limited"
 			}
-		]
+		],
+		"menus": {
+			"editor/context": [
+				{
+					"command": "extension.toggleScopeHover"
+				}
+			]
+		}
 	},
 	"activationEvents": [
 		"*"
@@ -128,8 +170,9 @@
 	},
 	"devDependencies": {
 		"@types/mocha": "^7.0.2",
-		"@types/node": "^13.13.4",
+		"@types/node": "^13.13.5",
 		"@types/oniguruma": "^7.0.1",
+		"@types/vscode": "^1.44.0",
 		"@typescript-eslint/eslint-plugin": "^2.31.0",
 		"@typescript-eslint/parser": "^2.31.0",
 		"copyfiles": "^2.2.0",

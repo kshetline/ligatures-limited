@@ -136,7 +136,8 @@ export function activate(context: ExtensionContext): void {
           const specificScope = _last(scope.scopes);
 
           // Did the matched ligature overshoot a token boundary?
-          if (ligature.length > scope.text.length && !bleedThroughs.has(ligature)) {
+          if (ligature.length > scope.text.length &&
+              !bleedThroughs.has(ligature) && !(category === 'string' && ligature === '\\\\\\')) {
             shortened = true;
             matcher.lastIndex -= ligature.length - scope.text.length;
             ligature = ligature.substr(0, scope.text.length);

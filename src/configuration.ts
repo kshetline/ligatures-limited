@@ -42,15 +42,17 @@ const baseLigatures = String.raw`
 
 `.trim().split(/\s+/);
 
-const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '9x9']);
+const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0x0', '9x9']);
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
 const baseLigaturesByContext = {
   number: {
     debug: false,
-    ligatures: new Set(['0x']),
-    ligaturesListedAreEnabled: true
+    ligatures: new Set(baseDisabledLigatures),
+    ligaturesListedAreEnabled: false
   }
 };
+
+baseLigaturesByContext.number.ligatures.delete('0x0');
 
 let defaultConfiguration: InternalConfig;
 const configurationsByLanguage = new Map<string, InternalConfig>();

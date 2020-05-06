@@ -2,13 +2,13 @@
 
 ## Code ligatures _only where you want them_, not where you don't
 
-I enjoy using ligature fonts for coding so that symbols like arrows (`=>`) look like arrows (<span style="position: relative; top: 0.1em; display: inline-block;font-size: 1.75em; height: 1em">`⇒`</span>) and less-than-or-equal signs (`<=`) look like the real thing from math class (`≤`). The problem is that, even with some of the contextual smarts build into ligature fonts like Fira Code, ligatures have a knack of popping up where you don't want them.
+I enjoy using ligature fonts for coding so that symbols like arrows (`=>`) look like arrows (`⇒`) and does-not-equal signs (`!=`) look like the real thing from math class (`≠`). The problem is that, even with some of the contextual smarts build into ligature fonts like Fira Code, ligatures have a knack of popping up where you don't want them.
 
 <img src="https://shetline.com/readme/ligatures-limited/v1.0.0/without_suppressed_ligatures.jpg" width="407" height="67" alt="Without ligature suppression">
 <br>
 <img src="https://shetline.com/readme/ligatures-limited/v1.0.0/with_suppressed_ligatures.jpg" width="407" height="67" alt="With ligature suppression">
 
-*Ligatures Limited* is designed to make the rendering of ligatures context-dependent.
+*Ligatures Limited* is designed to make the rendering of ligatures more context-dependent.
 
 In the top image, you can see ligatures that don't make sense where they are — in the regex, where three different characters are being checked (not one big two-headed arrow), and the oddly formatted asterisks in the message string.
 
@@ -16,7 +16,7 @@ The image below shows how those out-of-place ligatures are suppressed by *Ligatu
 
 With the defaults settings for this extension, ligatures are only rendered in three contexts: _operators_, _punctuation_, and _comment markers_, plus one special case: `0x` when followed by a hexadecimal digit in a numeric context, rendered as `0×` (if supported by your chosen font).
 
-Also by default, ligatures for `www`, `ff`, `fi`, `fl`, `ffi`, `ffl` are suppressed in all contexts, as well as the special case of `x` between any two decimal digits, which, unless suppressed, renders as (for example) `2×4`. If you want to see these ligatures (provided, of courses, that your chosen font contains them), you must expressly enable them.
+Also by default, ligatures for `www`, `ff`, `fi`, `fl`, `ffi`, `ffl` are suppressed in all contexts, as well as the special case of `x` between any two decimal digits, which, unless suppressed, renders as (for example) `2×4`. If you want to see any of these ligatures rendered (provided, of courses, that your chosen font defines them), you must expressly enable them.
 
 Ligatures can also be suppressed (with individual characters shown instead) at the current insert cursor position (this is the default setting), for all of the current line being edited, or within all of the current text selection. This feature can be turned off entirely as well, so that the cursor position or text selection has no effect.
 
