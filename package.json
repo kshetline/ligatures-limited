@@ -156,7 +156,7 @@
 	},
 	"homepage": "https://github.com/kshetline/ligatures-limited/blob/master/README.md",
 	"bugs": {
-		"url": "https://github.com/kshetline/ligatures-limited/issues",
+		"url": "https://github.com/kshetline/ligatures-limited/issues"
 	},
 	"scripts": {
 		"vscode:prepublish": "webpack --mode production",
