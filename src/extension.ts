@@ -133,7 +133,6 @@ export function activate(context: ExtensionContext): void {
           let shortened = false;
           const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
           let category = scope.category;
-          let extraLength = 0;
           const specificScope = _last(scope.scopes);
 
           // Did the matched ligature overshoot a token boundary?
@@ -143,16 +142,13 @@ export function activate(context: ExtensionContext): void {
             ligature = ligature.substr(0, scope.text.length);
           }
 
-          // Treat 0b, 0o, and 0x as special cases: they might be the lead-in to a numeric constant,
+          // 0x followed by a hex digit as a special case: the 0x part might be the lead-in to a numeric constant,
           // but treated as a separate keyword.
-          if (/^0[box]$/.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
+          if (/^0x[0-9a-f]$/i.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
             const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
 
-            if (nextScope.category === 'number') {
+            if (nextScope.category === 'number')
               category = 'number';
-              ++matcher.lastIndex;
-              extraLength = 1;
-            }
           }
 
           if (selectionMode !== 'off' && editor.selections?.length > 0 &&
@@ -174,11 +170,11 @@ export function activate(context: ExtensionContext): void {
           const debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
 
           if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !contexts.has(category)) {
-            for (let j = 0; j < ligature.length + extraLength; ++j)
+            for (let j = 0; j < ligature.length; ++j)
               (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
           }
           else if (debug)
-            highlights.push(new Range(i, index, i, index + ligature.length + extraLength));
+            highlights.push(new Range(i, index, i, index + ligature.length));
         }
 
         if (processMillis() > started + 50_000_000) {

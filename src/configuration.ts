@@ -37,12 +37,12 @@ const baseLigatures = String.raw`
 .= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
 '=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
 '<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
-';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0x
+';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0xF 9x9
 '-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(
 
 `.trim().split(/\s+/);
 
-const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl']);
+const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '9x9']);
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
 const baseLigaturesByContext = {
   number: {
@@ -203,7 +203,9 @@ export function readConfiguration(language?: string, loopCheck = new Set<string>
   const allLigatures = Array.from(globalLigatures);
 
   allLigatures.sort((a, b) => b.length - a.length); // Sort from longest to shortest
-  globalMatchLigatures = new RegExp(allLigatures.map(lg => lg.replace(escapeRegex, '\\$&')).join('|'), 'g');
+  globalMatchLigatures = new RegExp(allLigatures.map(lg =>
+    lg.replace(escapeRegex, '\\$&').replace('0xF', '0x[0-9a-fA-F]').replace('9x9', '\\dx\\d')
+  ).join('|'), 'g');
 
   if (!language)
     defaultConfiguration = internalConfig;
