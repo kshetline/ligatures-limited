@@ -13,5 +13,6 @@ webpack.config.js
 .editorconfig
 .eslintignore
 .eslintrc.json
+.markdownlint.json
 *.vsix
 !node_modules/vscode-oniguruma-wasm/release/onig.wasm

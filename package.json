@@ -1,68 +1,29 @@
 {
 	"name": "ligatures-limited",
-	"displayName": "Ligatures Limited",
-	"description": "Only display ligatures in a limited context, such as operators, but not within strings.",
 	"version": "1.0.0-beta",
-	"author": "Kerry Shetline",
 	"publisher": "kshetline",
 	"engines": {
 		"vscode": "^1.5.0"
 	},
+	"license": "MIT",
+	"displayName": "Ligatures Limited",
+	"description": "Code ligatures only where you want them, not where you don't",
 	"categories": [
 		"Other"
-	],
-	"icon": "img/icon.png",
-	"activationEvents": [
-		"*"
 	],
 	"keywords": [
 		"ligature",
 		"ligatures",
-		"scope"
+		"scope",
+		"fira code",
+		"fira"
 	],
+	"galleryBanner": {
+		"color": "#EFF1F3",
+		"theme": "dark"
+	},
+	"preview": true,
 	"main": "./dist/extension",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/kshetline/ligatures-limited.git"
-	},
-	"license": "MIT",
-	"scripts": {
-		"vscode:prepublish": "webpack --mode production",
-		"webpack": "webpack --mode development",
-		"webpack-dev": "webpack --mode development --watch",
-		"test-compile": "tsc -p ./",
-		"compile": "copyfiles -f dev/extension.js dist && tsc -p ./",
-		"postinstall": "node ./node_modules/vscode/bin/install",
-		"lint": "eslint \"**/*.ts\""
-	},
-	"dependencies": {
-		"ks-util": "^1.11.0",
-		"vscode-oniguruma-wasm": "^1.1.0",
-		"vscode-test": "^1.3.0",
-		"vscode-textmate": "^5.1.1"
-	},
-	"devDependencies": {
-		"@types/mocha": "^7.0.2",
-		"@types/node": "^13.13.4",
-		"@types/oniguruma": "^7.0.1",
-		"@typescript-eslint/eslint-plugin": "^2.31.0",
-		"@typescript-eslint/parser": "^2.31.0",
-		"copyfiles": "^2.2.0",
-		"eslint": "^6.8.0",
-		"eslint-config-standard": "^14.1.1",
-		"eslint-plugin-chai-friendly": "^0.6.0",
-		"eslint-plugin-import": "^2.20.2",
-		"eslint-plugin-jasmine": "^4.1.1",
-		"eslint-plugin-node": "^11.1.0",
-		"eslint-plugin-promise": "^4.2.1",
-		"eslint-plugin-standard": "^4.0.1",
-		"mocha": "^7.1.2",
-		"ts-loader": "^7.0.2",
-		"typescript": "^3.8.3",
-		"vscode": "^1.1.37",
-		"webpack": "^4.43.0",
-		"webpack-cli": "^3.3.11"
-	},
 	"contributes": {
 		"configuration": {
 			"type": "object",
@@ -153,5 +114,57 @@
 				"category": "ligatures-limited"
 			}
 		]
+	},
+	"activationEvents": [
+		"*"
+	],
+	"markdown": "github",
+	"qna": "marketplace",
+	"dependencies": {
+		"ks-util": "^1.11.0",
+		"vscode-oniguruma-wasm": "^1.1.0",
+		"vscode-test": "^1.3.0",
+		"vscode-textmate": "^5.1.1"
+	},
+	"devDependencies": {
+		"@types/mocha": "^7.0.2",
+		"@types/node": "^13.13.4",
+		"@types/oniguruma": "^7.0.1",
+		"@typescript-eslint/eslint-plugin": "^2.31.0",
+		"@typescript-eslint/parser": "^2.31.0",
+		"copyfiles": "^2.2.0",
+		"eslint": "^6.8.0",
+		"eslint-config-standard": "^14.1.1",
+		"eslint-plugin-chai-friendly": "^0.6.0",
+		"eslint-plugin-import": "^2.20.2",
+		"eslint-plugin-jasmine": "^4.1.1",
+		"eslint-plugin-node": "^11.1.0",
+		"eslint-plugin-promise": "^4.2.1",
+		"eslint-plugin-standard": "^4.0.1",
+		"mocha": "^7.1.2",
+		"ts-loader": "^7.0.2",
+		"typescript": "^3.8.3",
+		"vscode": "^1.1.37",
+		"webpack": "^4.43.0",
+		"webpack-cli": "^3.3.11"
+	},
+	"icon": "img/icon.png",
+	"author": "Kerry Shetline",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/kshetline/ligatures-limited.git"
+	},
+	"homepage": "https://github.com/kshetline/ligatures-limited/blob/master/README.md",
+	"bugs": {
+		"url": "https://github.com/kshetline/ligatures-limited/issues",
+	},
+	"scripts": {
+		"vscode:prepublish": "webpack --mode production",
+		"webpack": "webpack --mode development",
+		"webpack-dev": "webpack --mode development --watch",
+		"compile": "copyfiles -f dev/extension.js dist && tsc -p ./",
+		"postinstall": "node ./node_modules/vscode/bin/install",
+		"test": "npm run compile && node ./node_modules/vscode/bin/text",
+		"lint": "eslint \"**/*.ts\""
 	}
 }
