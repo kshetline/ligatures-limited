@@ -1,6 +1,6 @@
 {
 	"name": "ligatures-limited",
-	"version": "0.0.2",
+	"version": "1.0.0",
 	"publisher": "kshetline",
 	"engines": {
 		"vscode": "^1.44.0"
@@ -22,7 +22,7 @@
 		"color": "#003399",
 		"theme": "dark"
 	},
-	"preview": true,
+	"preview": false,
 	"main": "./dist/extension",
 	"contributes": {
 		"configurationDefaults": {
@@ -190,13 +190,12 @@
 	},
 	"devDependencies": {
 		"@types/mocha": "^7.0.2",
-		"@types/node": "^13.13.5",
+		"@types/node": "^14.0.1",
 		"@types/oniguruma": "^7.0.1",
-		"@types/vscode": "^1.44.0",
-		"@typescript-eslint/eslint-plugin": "^2.31.0",
-		"@typescript-eslint/parser": "^2.31.0",
+		"@typescript-eslint/eslint-plugin": "^2.33.0",
+		"@typescript-eslint/parser": "^2.33.0",
 		"copyfiles": "^2.2.0",
-		"eslint": "^6.8.0",
+		"eslint": "^7.0.0",
 		"eslint-config-standard": "^14.1.1",
 		"eslint-plugin-chai-friendly": "^0.6.0",
 		"eslint-plugin-import": "^2.20.2",
@@ -205,8 +204,8 @@
 		"eslint-plugin-promise": "^4.2.1",
 		"eslint-plugin-standard": "^4.0.1",
 		"mocha": "^7.1.2",
-		"ts-loader": "^7.0.2",
-		"typescript": "^3.8.3",
+		"ts-loader": "^7.0.4",
+		"typescript": "^3.9.2",
 		"vscode": "^1.1.37",
 		"webpack": "^4.43.0",
 		"webpack-cli": "^3.3.11"

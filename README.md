@@ -2,7 +2,7 @@
 
 ## Code ligatures _only where you want them_, not where you don’t
 
-I enjoy using ligature fonts for coding so that symbols like arrows (<span>`=`</span><span>`>`</span>) look like arrows (`⇒`) and does-not-equal signs (<span>`!`</span><span>`=`</span>) look like the real thing from math class (`≠`). The problem is that, even with some of the contextual smarts build into ligature fonts like Fira Code, ligatures have a knack of popping up where you don’t want them.
+I enjoy using ligature fonts for coding so that symbols like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/fat_arrow_nolig.png" width="16" height="14" align="absmiddle" alt="fat arrow no ligature">) look like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/fat_arrow.png" width="17" height="14" align="absmiddle" alt="fat arrow no ligature">) and does-not-equal signs (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/not_equal_nolig.png" width="17" height="14" align="absmiddle" alt="fat arrow no ligature">) look like the real thing from math class (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/not_equal.png" width="17" height="14" align="absmiddle" alt="fat arrow no ligature">). The problem is that, even with some of the contextual smarts build into ligature fonts like Fira Code, ligatures have a knack of popping up where you don’t want them.
 
 <img src="https://shetline.com/readme/ligatures-limited/v1.0.0/without_suppressed_ligatures.jpg" width="407" height="67" alt="Without ligature suppression">
 <br>
@@ -14,7 +14,7 @@ In the top image, you can see ligatures that don’t make sense where they are �
 
 The image below shows how those out-of-place ligatures are suppressed by *Ligatures Limited*, replaced with individual characters, while the triple-equals and double-ampersand ligatures are retained.
 
-With the defaults settings for this extension ligatures are only rendered in three contexts: _operators_, _punctuation_, and _comment markers_, plus one special case: <span>`0`</span><span>`x`</span> when followed by a hexadecimal digit in a numeric context, rendered as `0×` (if supported by your chosen font).
+With the default settings for this extension ligatures are only rendered in three contexts: _operators_, _punctuation_, and _comment markers_, plus one special case: <span>`0`</span><span>`x`</span> when followed by a hexadecimal digit in a numeric context, rendered as `0×` (if supported by your chosen font).
 
 Also by default, ligatures for `www`, `ff`, `fi`, `fl`, `ffi`, `ffl` are suppressed in all contexts, as well as the special case of `x` between any two decimal digits, which, unless suppressed, may render as (for example) `2×4`. If you want to see any of these ligatures rendered (provided, of course, that your chosen font defines them), you must expressly enable them.
 
@@ -34,7 +34,7 @@ As rendered using Fira Code:
 Fira Code again, but with all ligatures suppressed
 <img src="https://shetline.com/readme/ligatures-limited/v1.0.0/ligature_set_suppressed.jpg" width="763" height="100" alt="Supported ligatures as individual characters">
 
-<span>`0x`</span><span>`F`</span> represents `0x` followed be any hexadecimal digit, and <span>`9x`</span><span>`9`</span> represents `x` surrounded by any decimal digits. You can specify your own additional ligatures if you need *Ligatures Limited* to be aware of them.
+<span>`0x`</span><span>`F`</span> represents `0x` followed by any hexadecimal digit, and <span>`9x`</span><span>`9`</span> represents `x` surrounded by any decimal digits. You can specify your own additional ligatures if you need *Ligatures Limited* to be aware of them.
 
 ## Commands
 
@@ -61,7 +61,7 @@ In lieu of a long-winded explanation of custom settings, for now I’ll just pro
 
 ### Contexts
 
-A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type.ts`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the type of language token within which the ligature is embedded, and then applying the rules from your settings.
+A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type.ts`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the types of language tokens within which these ligatures are embedded, and then applying the rules from your settings.
 
 ```text
 attribute_name  comment         comment_marker  constant        function
