@@ -96,7 +96,15 @@ export function readConfiguration(language?: string, loopCheck = new Set<string>
 
     // Getting language-specific settings for your own extension is a bit of a hack, sorry to say!
     const languages = workspace.getConfiguration().get('ligaturesLimited.languages');
-    let languageConfig = languages && (languages[language] || languages[`[${language}]`]);
+    const languageMap = new Map<string, string>();
+
+    if (languages) {
+      Object.keys(languages).forEach(key =>
+        // eslint-disable-next-line no-useless-escape
+        toStringArray(key.replace(/[\[\]]/g, ''), true).forEach(subKey => languageMap.set(subKey, key)));
+    }
+
+    let languageConfig = languages && languages[languageMap.get(language) ?? ''];
     let prefix = '';
 
     if (!languageConfig) {

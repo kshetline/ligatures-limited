@@ -4,6 +4,7 @@
 * Made TextMate scope specification more flexible
 * Handles CSS and JavaScript nested within HTML using proper corresponding rules.
 * Fixed some ligatures which were not being matched
+* Fixed handling of comma-separated language lists
 
 ## 0.0.2
 
