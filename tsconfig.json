@@ -27,8 +27,6 @@
     "out",
     "dev",
     "dist",
-    ".vscode-test",
-    "test",
-    "test/test_files"
+    ".vscode-test"
   ]
 }
