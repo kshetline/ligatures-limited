@@ -61,7 +61,7 @@ In lieu of a long-winded explanation of custom settings, for now I’ll just pro
 
 ### Contexts
 
-A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type.ts`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the types of language tokens within which these ligatures are embedded, and then applying the rules from your settings.
+A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the types of language tokens within which these ligatures are embedded, and then applying the rules from your settings.
 
 ```text
 attribute_name  comment         comment_marker  constant        function
@@ -120,7 +120,7 @@ The two fonts I typically use (Fira Code and my own home-brew version of Menlo) 
 
 ...no extra effort is wasted by *Ligatures Limited* to suppress ligatures that aren’t there to suppress in the first place.
 
-(Please note that *Ligatures Limited* can’t force ligatures to be rendered that aren’t provided by your selected font.)
+(Please note that *Ligatures Limited* can’t force ligatures to be rendered that aren’t provided by your selected font in the first place.)
 
 ## Credits
 

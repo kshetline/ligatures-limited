@@ -1,13 +1,18 @@
 import * as assert from 'assert';
-// import { before } from 'mocha';
-import * as vscode from 'vscode';
+import { before } from 'mocha';
+import vscode, { Extension } from 'vscode';
 // import * as myExtension from '../../src/extension';
 
 suite('Extension Tests', () => {
+  let extension: Extension<any>;
+
   vscode.window.showInformationMessage('Start all tests.');
 
-  test('Sample test', () => {
-    assert.equal(-1, [1, 2, 3].indexOf(5));
-    assert.equal(-1, [1, 2, 3].indexOf(0));
+  before(() => {
+    extension = vscode.extensions.getExtension('kshetline.ligatures-limited');
+  });
+
+  test('extension loads', () => {
+    assert.ok(extension);
   });
 });

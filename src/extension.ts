@@ -122,7 +122,6 @@ export function activate(context: ExtensionContext): void {
     if (ligatureSuppression) {
       const started = processMillis();
       const docLanguage = document.languageId;
-      console.log('docLanguage:', docLanguage);
       const docLangConfig = readConfiguration(docLanguage);
       let lastTokenLanguage: string;
       let lastTokenConfig: InternalConfig;
