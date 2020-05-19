@@ -74,7 +74,7 @@ typings/
 .vscode
 !.vscode/launch.json
 !.vscode/tasks.json
-
+!test/**/.vscode
 # System Files
 .DS_Store
 Thumbs.db
