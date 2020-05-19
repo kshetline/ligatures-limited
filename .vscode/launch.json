@@ -24,7 +24,8 @@
       "runtimeExecutable": "${execPath}",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
-        "--extensionTestsPath=${workspaceFolder}/out/test/suite"
+        "--extensionTestsPath=${workspaceFolder}/out/test/suite",
+        "${workspaceFolder}/test/suite/sample-project"
       ],
       "outFiles": [
         "${workspaceFolder}/out/test/**/*.js"

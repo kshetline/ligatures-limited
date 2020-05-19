@@ -10,10 +10,12 @@ import { last as _last, processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
 
-const breakNormal = window.createTextEditorDecorationType({ color: '' });
-const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
-const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: new ThemeColor('editor.foreground') });
-const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
+export const breakNormal = window.createTextEditorDecorationType({ color: '' });
+export const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
+export const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: new ThemeColor('editor.foreground') });
+export const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
+export const ligatureDecorations = [breakNormal, breakDebug, highlightLigature, allLigatures];
+
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
 let globalDebug: boolean = null;
 let selectionModeOverride: SelectionMode = null;
