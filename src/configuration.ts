@@ -18,6 +18,12 @@ interface LLConfiguration {
   selectionMode?: SelectionMode;
 }
 
+export interface ContextConfig {
+  debug: boolean;
+  ligatures: Set<string>;
+  ligaturesListedAreEnabled: boolean;
+}
+
 export interface InternalConfig {
   compactScopeDisplay: boolean;
   contexts: Set<string>;
@@ -25,25 +31,20 @@ export interface InternalConfig {
   ligatures: Set<string>;
   ligaturesListedAreEnabled: boolean;
   selectionMode: SelectionMode;
-
-  ligaturesByContext: Record<string, {
-    debug: boolean;
-    ligatures: Set<string>;
-    ligaturesListedAreEnabled: boolean;
-  }>;
+  ligaturesByContext: Record<string, ContextConfig>;
 }
 
 const baseLigatures = String.raw`
 
 .= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
-'=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
-'<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
-';; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0xF 9x9
-'-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(
+=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
+<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
+;; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0xF 9x9
+-~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(
 
 `.trim().split(/\s+/);
 
-const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0x0', '9x9']);
+const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '9x9']);
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
 const baseLigaturesByContext = {
   number: {
@@ -53,14 +54,17 @@ const baseLigaturesByContext = {
   }
 };
 
-baseLigaturesByContext.number.ligatures.delete('0x0');
+baseLigaturesByContext.number.ligatures.delete('0xF');
 
 let defaultConfiguration: InternalConfig;
 const configurationsByLanguage = new Map<string, InternalConfig>();
 let globalLigatures: Set<string>;
 let globalMatchLigatures: RegExp;
 
-const escapeRegex = /[-[\]/{}()*+?.\\^$|]/g;
+// The \ before the second [ is considered unnecessary here by ESLine, but being left out
+// is an error for some regex parsers.
+// eslint-disable-next-line no-useless-escape
+const escapeRegex = /[-\[\]/{}()*+?.\\^$|]/g;
 
 export function resetConfiguration(): void {
   defaultConfiguration = undefined;
@@ -92,7 +96,15 @@ export function readConfiguration(language?: string, loopCheck = new Set<string>
 
     // Getting language-specific settings for your own extension is a bit of a hack, sorry to say!
     const languages = workspace.getConfiguration().get('ligaturesLimited.languages');
-    let languageConfig = languages && (languages[language] || languages[`[${language}]`]);
+    const languageMap = new Map<string, string>();
+
+    if (languages) {
+      Object.keys(languages).forEach(key =>
+        // eslint-disable-next-line no-useless-escape
+        toStringArray(key.replace(/[\[\]]/g, ''), true).forEach(subKey => languageMap.set(subKey, key)));
+    }
+
+    let languageConfig = languages && languages[languageMap.get(language) ?? ''];
     let prefix = '';
 
     if (!languageConfig) {

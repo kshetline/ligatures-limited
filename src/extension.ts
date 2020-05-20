@@ -4,16 +4,18 @@
 // This extension also replicates (and expands) the functionality provided by
 // vscode-Disable-Ligatures.
 
-import { getLigatureMatcher, resetConfiguration, readConfiguration, SelectionMode } from './configuration';
+import { ContextConfig, getLigatureMatcher, InternalConfig, readConfiguration, resetConfiguration, SelectionMode } from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
 
-const breakNormal = window.createTextEditorDecorationType({ color: '' });
-const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
-const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: new ThemeColor('editor.foreground') });
-const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
+export const breakNormal = window.createTextEditorDecorationType({ color: '' });
+export const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
+export const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: new ThemeColor('editor.foreground') });
+export const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
+export const ligatureDecorations = [breakNormal, breakDebug, highlightLigature, allLigatures];
+
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
 let globalDebug: boolean = null;
 let selectionModeOverride: SelectionMode = null;
@@ -24,9 +26,9 @@ let ligatureSuppression = true;
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
 
-  registerCommand(context, 'extension.cycleLigatureDebug', cycleDebug);
-  registerCommand(context, 'extension.cycleSelectionMode', cycleSelectionMode);
-  registerCommand(context, 'extension.toggleLigatureSuppression', toggleLigatures);
+  registerCommand(context, 'ligaturesLimited.cycleLigatureDebug', cycleDebug);
+  registerCommand(context, 'ligaturesLimited.cycleSelectionMode', cycleSelectionMode);
+  registerCommand(context, 'ligaturesLimited.toggleLigatureSuppression', toggleLigatures);
 
   workspace.onDidChangeConfiguration(() => {
     resetConfiguration();
@@ -121,11 +123,10 @@ export function activate(context: ExtensionContext): void {
 
     if (ligatureSuppression) {
       const started = processMillis();
-      const langConfig = readConfiguration(document.languageId);
-      const selectionMode = selectionModeOverride ?? langConfig.selectionMode;
-      const langLigatures = langConfig.ligatures;
-      const contexts = langConfig.contexts;
-      const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
+      const docLanguage = document.languageId;
+      const docLangConfig = readConfiguration(docLanguage);
+      let lastTokenLanguage: string;
+      let lastTokenConfig: InternalConfig;
       const matcher = getLigatureMatcher();
 
       for (let i = first; i <= last; ++i) {
@@ -140,6 +141,18 @@ export function activate(context: ExtensionContext): void {
           const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
           let category = scope.category;
           const specificScope = _last(scope.scopes);
+          const language = getTokenLanguage(docLanguage, specificScope);
+          let langConfig = docLangConfig;
+
+          if (language !== docLanguage) {
+            langConfig = (lastTokenConfig && lastTokenLanguage === language) ? lastTokenConfig :
+              lastTokenConfig = readConfiguration(lastTokenLanguage = language);
+          }
+
+          const selectionMode = selectionModeOverride ?? langConfig.selectionMode;
+          const langLigatures = langConfig.ligatures;
+          const contexts = langConfig.contexts;
+          const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
 
           // Did the matched ligature overshoot a token boundary?
           if (ligature.length > scope.text.length &&
@@ -170,13 +183,12 @@ export function activate(context: ExtensionContext): void {
             }
           }
 
-          const contextConfig = (langConfig.ligaturesByContext &&
-            (langConfig.ligaturesByContext[specificScope] ?? langConfig.ligaturesByContext[category]));
+          const contextConfig = findContextConfig(langConfig, specificScope, category);
           const contextLigatures = contextConfig?.ligatures ?? langLigatures;
           const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
           const debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
 
-          if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !contexts.has(category)) {
+          if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category)) {
             for (let j = 0; j < ligature.length; ++j)
               (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
           }
@@ -198,6 +210,46 @@ export function activate(context: ExtensionContext): void {
     editor.setDecorations(highlightLigature, highlights);
     editor.setDecorations(allLigatures, background);
   }
+}
+
+function getTokenLanguage(docLanguage: string, scope: string): string {
+  const suffix = (/\.([^.]+)$/.exec(scope) ?? [])[1];
+
+  if (!suffix || !/^(html|xhtml|xml)$/.test(docLanguage))
+    return docLanguage;
+
+  switch (suffix) {
+    case 'js': return 'javascript';
+    case 'css': return 'css';
+  }
+
+  return docLanguage;
+}
+
+function findContextConfig(config: InternalConfig, scope: string, category: string): ContextConfig {
+  const byContext = config.ligaturesByContext;
+
+  if (!byContext)
+    return undefined;
+
+  let match = byContext[category];
+
+  while (!match && scope && !(match = byContext[scope]))
+    scope = (/^(.+)\../.exec(scope) ?? [])[1];
+
+  return match;
+}
+
+function matchesContext(contexts: Set<String>, scope: string, category: string): boolean {
+  if (!contexts)
+    return false;
+
+  let matches = contexts.has(category);
+
+  while (!matches && scope && !(matches = contexts.has(scope)))
+    scope = (/^(.+)\../.exec(scope) ?? [])[1];
+
+  return matches;
 }
 
 function isValidDocument(document: TextDocument): boolean {

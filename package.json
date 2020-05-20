@@ -1,6 +1,6 @@
 {
 	"name": "ligatures-limited",
-	"version": "0.0.2",
+	"version": "1.0.0",
 	"publisher": "kshetline",
 	"engines": {
 		"vscode": "^1.44.0"
@@ -22,7 +22,6 @@
 		"color": "#003399",
 		"theme": "dark"
 	},
-	"preview": true,
 	"main": "./dist/extension",
 	"contributes": {
 		"configurationDefaults": {
@@ -81,6 +80,10 @@
 								"type": "string",
 								"description": "For language-specific settings, a language ID to for that language to inherit from.",
 								"language-overridable": true
+							},
+							"ligatures": {
+								"type": "string",
+								"description": "Ligatures to enable or disable in this context."
 							},
 							"ligaturesByContext": {
 								"type": "object",
@@ -149,22 +152,22 @@
 		},
 		"commands": [
 			{
-				"command": "extension.cycleLigatureDebug",
+				"command": "ligaturesLimited.cycleLigatureDebug",
 				"title": "Cycle through the three modes of ligature debugging: by settings, all on, all off",
 				"category": "ligatures-limited"
 			},
 			{
-				"command": "extension.cycleSelectionMode",
+				"command": "ligaturesLimited.cycleSelectionMode",
 				"title": "Cycle through the five modes of disabling ligatures by selection: by settings, off, cursor, line, full selection",
 				"category": "ligatures-limited"
 			},
 			{
-				"command": "extension.toggleLigatureSuppression",
+				"command": "ligaturesLimited.toggleLigatureSuppression",
 				"title": "Toggle suppression of ligatures",
 				"category": "ligatures-limited"
 			},
 			{
-				"command": "extension.toggleScopeHover",
+				"command": "ligaturesLimited.toggleScopeHover",
 				"title": "Toggle Ligatures Limited hover information",
 				"category": "ligatures-limited"
 			}
@@ -172,7 +175,7 @@
 		"menus": {
 			"editor/context": [
 				{
-					"command": "extension.toggleScopeHover"
+					"command": "ligaturesLimited.toggleScopeHover"
 				}
 			]
 		}
@@ -189,14 +192,18 @@
 		"vscode-textmate": "^5.1.1"
 	},
 	"devDependencies": {
+		"@types/chai": "^4.2.11",
+		"@types/chai-spies": "^1.0.1",
+		"@types/glob": "^7.1.1",
 		"@types/mocha": "^7.0.2",
-		"@types/node": "^13.13.5",
+		"@types/node": "^14.0.4",
 		"@types/oniguruma": "^7.0.1",
-		"@types/vscode": "^1.44.0",
-		"@typescript-eslint/eslint-plugin": "^2.31.0",
-		"@typescript-eslint/parser": "^2.31.0",
+		"@typescript-eslint/eslint-plugin": "^2.34.0",
+		"@typescript-eslint/parser": "^2.34.0",
+		"chai": "^4.2.0",
+		"chai-spies": "^1.0.0",
 		"copyfiles": "^2.2.0",
-		"eslint": "^6.8.0",
+		"eslint": "^7.0.0",
 		"eslint-config-standard": "^14.1.1",
 		"eslint-plugin-chai-friendly": "^0.6.0",
 		"eslint-plugin-import": "^2.20.2",
@@ -204,9 +211,10 @@
 		"eslint-plugin-node": "^11.1.0",
 		"eslint-plugin-promise": "^4.2.1",
 		"eslint-plugin-standard": "^4.0.1",
+		"glob": "^7.1.6",
 		"mocha": "^7.1.2",
-		"ts-loader": "^7.0.2",
-		"typescript": "^3.8.3",
+		"ts-loader": "^7.0.4",
+		"typescript": "^3.9.3",
 		"vscode": "^1.1.37",
 		"webpack": "^4.43.0",
 		"webpack-cli": "^3.3.11"
@@ -227,7 +235,7 @@
 		"webpack-dev": "webpack --mode development --watch",
 		"compile": "copyfiles -f dev/extension.js dist && tsc -p ./",
 		"postinstall": "node ./node_modules/vscode/bin/install",
-		"test": "npm run compile && node ./node_modules/vscode/bin/text",
+		"test": "node ./out/sample/test/runTest.js",
 		"lint": "eslint \"**/*.ts\""
 	}
 }
