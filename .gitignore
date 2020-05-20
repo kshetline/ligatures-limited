@@ -71,10 +71,11 @@ typings/
 *.launch
 .settings/
 *.sublime-workspace
-.vscode
+/.vscode
 !.vscode/launch.json
 !.vscode/tasks.json
-!test/**/.vscode
+!/test/**/.vscode
+!/test/**/.vscode/*
 # System Files
 .DS_Store
 Thumbs.db

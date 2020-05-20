@@ -26,9 +26,9 @@ let ligatureSuppression = true;
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
 
-  registerCommand(context, 'extension.cycleLigatureDebug', cycleDebug);
-  registerCommand(context, 'extension.cycleSelectionMode', cycleSelectionMode);
-  registerCommand(context, 'extension.toggleLigatureSuppression', toggleLigatures);
+  registerCommand(context, 'ligaturesLimited.cycleLigatureDebug', cycleDebug);
+  registerCommand(context, 'ligaturesLimited.cycleSelectionMode', cycleSelectionMode);
+  registerCommand(context, 'ligaturesLimited.toggleLigatureSuppression', toggleLigatures);
 
   workspace.onDidChangeConfiguration(() => {
     resetConfiguration();
@@ -215,7 +215,7 @@ export function activate(context: ExtensionContext): void {
 function getTokenLanguage(docLanguage: string, scope: string): string {
   const suffix = (/\.([^.]+)$/.exec(scope) ?? [])[1];
 
-  if (!suffix || !/^(html|xml)$/.test(docLanguage))
+  if (!suffix || !/^(html|xhtml|xml)$/.test(docLanguage))
     return docLanguage;
 
   switch (suffix) {

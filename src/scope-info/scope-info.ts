@@ -143,7 +143,7 @@ async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
 }
 
 export function activate(context: ExtensionContext): ScopeInfoAPI {
-  registerCommand(context, 'extension.toggleScopeHover', toggleScopeHover);
+  registerCommand(context, 'ligaturesLimited.toggleScopeHover', toggleScopeHover);
   context.subscriptions.push(workspace.onDidOpenTextDocument(openDocument));
   context.subscriptions.push(workspace.onDidCloseTextDocument(closeDocument));
   provideHoverInfo(context.subscriptions);

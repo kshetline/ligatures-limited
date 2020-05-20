@@ -1,0 +1,22 @@
+{
+    "ligaturesLimited.languages": {
+        "css, javascript": {
+            "ligaturesByContext": {
+                "comment.block": {
+                    "ligatures": "0 www"
+                }
+            }
+        },
+        "html": {
+            "ligaturesByContext": {
+                "attribute_value": {
+                    "ligatures": "0 www"
+                }
+            }
+        },
+        "typescript": {
+            "inherit": "javascript",
+            "ligatures": "- !="
+        }
+    }
+}

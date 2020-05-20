@@ -99,8 +99,12 @@ export class DocumentController implements Disposable {
         return 'regexp';
       else if (/\boperator|accessor|arrow|pointer-access|dot-access\b/.test(scope))
         return 'operator';
-      else if (/^string\b/.test(scope))
-        return 'string';
+      else if (/^string\b/.test(scope)) {
+        if (parentScope && /\battribute\b/.test(parentScope))
+          return 'attribute_value';
+        else
+          return 'string';
+      }
       else if (/^punctuation\.definition\.comment\b/.test(scope))
         return 'comment_marker';
       else if (/\bcomment\b/.test(scope))

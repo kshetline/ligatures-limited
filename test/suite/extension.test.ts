@@ -3,7 +3,7 @@ import spies from 'chai-spies';
 import { before, it, suite } from 'mocha';
 import path from 'path';
 import { commands, Extension, extensions, Range, TextEditor, TextEditorDecorationType, Uri, window } from 'vscode';
-import { breakNormal, allLigatures, ligatureDecorations } from '../../src/extension';
+import { breakNormal, breakDebug, highlightLigature, allLigatures, ligatureDecorations } from '../../src/extension';
 
 chai.use(spies);
 
@@ -46,8 +46,10 @@ function isCorrectlyDecorated(map: DecorationMap, line: number, column: number, 
     return false;
 
   for (const range of ranges) {
-    if (range.intersection(checkRange))
-      --width;
+    const intersection = range.intersection(checkRange);
+
+    if (intersection)
+      width -= intersection.end.character - intersection.start.character;
   }
 
   return width === 0;
@@ -56,7 +58,7 @@ function isCorrectlyDecorated(map: DecorationMap, line: number, column: number, 
 async function getDecorations(fileName: string): Promise<DecorationMap> {
   const docFile = Uri.file(path.join(__dirname, `../../../test/suite/sample-project/${fileName}`));
   await commands.executeCommand('vscode.open', docFile);
-  const editor = findEditor('sample.html');
+  const editor = findEditor(fileName);
   const decorations = new Map<string, Range[]>();
   let gotDecorations: (map: DecorationMap) => void;
 
@@ -101,7 +103,44 @@ suite('Extension Tests', () => {
     const decorations = await getDecorations('sample.html');
     expect(decorations).to.be.ok;
 
-    expect(isCorrectlyDecorated(decorations, 7, 5, 2, null), 'foo').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 7, 8, 3, breakNormal), 'bar').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 7, 5, 2, null), 'css /*').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 7, 8, 3, breakNormal), 'css ===').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 7, 12, 3, null), 'css www').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 13, 8, 3, breakNormal), 'js www in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 13, 12, 2, breakNormal), 'js == in lc').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 14, 8, 3, null), 'js www in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 14, 12, 2, breakNormal), 'js => in bc').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 15, 17, 3, null), 'js ===').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 16, 18, 2, null), 'js =>').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 21, 32, 3, null), 'html www in link').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 21, 54, 3, breakNormal), 'html www in text').to.be.ok;
+  });
+
+  it('should find debug ligatures in TypeScript document', async function () {
+    this.slow(1500);
+    this.timeout(2500);
+    await commands.executeCommand('ligaturesLimited.cycleLigatureDebug');
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
+    const decorations = await getDecorations('sample.ts');
+    expect(decorations).to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 1, 4, 3, breakDebug), 'ts www in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 8, 3, breakDebug), 'ts !== in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 12, 2, breakDebug), 'ts <= in lc').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 2, 4, 3, highlightLigature), 'ts www in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 2, 8, 3, breakDebug), 'ts !== in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 2, 12, 2, breakDebug), 'ts >= in lc').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 9, 9, 2, highlightLigature), 'ts <=').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 9, 19, 2, highlightLigature), 'ts >=').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 9, 29, 2, breakDebug), 'ts !=').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 10, 19, 2, highlightLigature), 'ts =>').to.be.ok;
   });
 });

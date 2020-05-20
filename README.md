@@ -64,11 +64,11 @@ In lieu of a long-winded explanation of custom settings, for now I’ll just pro
 A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the types of language tokens within which these ligatures are embedded, and then applying the rules from your settings.
 
 ```text
-attribute_name  comment         comment_marker  constant        function
-identifier      invalid         keyword         number          operator
-other           property_name   property_value  punctuation     regexp
-scope           string          tag             text            type
-variable
+attribute_name  attribute_value comment         comment_marker  constant
+function        identifier      invalid         keyword         number
+operator        other           property_name   property_value  punctuation
+regexp          scope           string          tag             text
+type            variable
 ```
 
 The rules for how *Ligatures Limited* handles ligatures can be summed up by the way you answer the question: “Which ligatures do I want to see, and which do I want suppressed, in which contexts and in which languages?”
