@@ -1,3 +1,7 @@
+## 1.0.1
+
+* Fix documentation typo.
+
 ## 1.0.0
 
 * First non-preview release

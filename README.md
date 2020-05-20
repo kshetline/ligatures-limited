@@ -149,7 +149,7 @@ The two fonts I typically use (Fira Code and my own home-brew version of Menlo) 
 }
 ```
 
-This configuration enables the `www` ligature, and only the `www` ligatures, within block comments for CSS and JavaScript.
+This configuration enables `www` ligatures, and only `www` ligatures, within block comments for CSS and JavaScript.
 
 TypeScript inherits the above behavior, and also disables the `!=` ligature in all contexts.
 
