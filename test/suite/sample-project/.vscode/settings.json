@@ -17,6 +17,13 @@
         "typescript": {
             "inherit": "javascript",
             "ligatures": "- !="
+        },
+        "[markdown]": {
+            "ligaturesByContext": {
+                "meta.paragraph": {
+                    "ligatures": "X"
+                }
+            }
         }
     }
 }

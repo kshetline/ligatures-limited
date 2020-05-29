@@ -1,6 +1,8 @@
 ## 1.0.2
 
-* Reduced code size. Improved documentation.
+* Improved error handling for invalid configurations
+* Amended documentation.
+* Reduced code size.
 
 ## 1.0.1
 

@@ -121,6 +121,14 @@ suite('Extension Tests', () => {
     expect(isCorrectlyDecorated(decorations, 21, 54, 3, breakNormal), 'html www in text').to.be.ok;
   });
 
+  it('should find no suppressed ligatures in sample Markdown', async function () {
+    this.slow(1000);
+    this.timeout(2000);
+    const decorations = await getDecorations('sample.md');
+    expect(decorations).to.be.ok;
+    expect(Array.from(decorations.values()).reduce((count, range) => count + range.length, 0)).to.equal(0);
+  });
+
   it('should find debug ligatures in TypeScript document', async function () {
     this.slow(1500);
     this.timeout(2500);
