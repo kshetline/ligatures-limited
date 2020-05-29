@@ -1,5 +1,4 @@
 // @ts-check
-
 'use strict';
 
 const path = require('path');
@@ -9,14 +8,14 @@ const config = {
   target: 'node',
   node: false,
 
-  entry: './src/extension.ts', // the entry point of this extension
+  entry: './src/extension.ts',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'extension.js',
     libraryTarget: 'commonjs2',
     devtoolModuleFilenameTemplate: '../[resource-path]'
   },
-  devtool: 'source-map',
+  devtool: process.env.NODE_ENV === 'production' ? undefined : 'source-map',
   externals: {
     vscode: 'commonjs vscode'
   },

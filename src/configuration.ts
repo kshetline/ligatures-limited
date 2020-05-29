@@ -1,5 +1,6 @@
 import { setCompactScope } from './scope-info/scope-info';
 import { workspace } from 'vscode';
+import { showErrorMessage } from './extension-util';
 
 export type SelectionMode = 'cursor' | 'line' | 'off' | 'selection';
 
@@ -33,6 +34,16 @@ export interface InternalConfig {
   selectionMode: SelectionMode;
   ligaturesByContext: Record<string, ContextConfig>;
 }
+
+const FALLBACK_CONFIG: InternalConfig = {
+  compactScopeDisplay: false,
+  contexts: new Set<string>(),
+  debug: false,
+  ligatures: new Set<string>(),
+  ligaturesListedAreEnabled: false,
+  selectionMode: 'cursor',
+  ligaturesByContext: {}
+};
 
 const baseLigatures = String.raw`
 
@@ -78,9 +89,19 @@ export function getLigatureMatcher(): RegExp {
   return globalMatchLigatures;
 }
 
-export function readConfiguration(language?: string, loopCheck = new Set<string>()): InternalConfig {
+export function readConfiguration(language?: string): InternalConfig {
+  try {
+    return readConfigurationAux(language);
+  }
+  catch (e) {
+    showErrorMessage(`Ligatures Limited configuration error: ${e.message}`);
+    return FALLBACK_CONFIG;
+  }
+}
+
+function readConfigurationAux(language?: string, loopCheck = new Set<string>()): InternalConfig {
   if (language && !defaultConfiguration)
-    defaultConfiguration = readConfiguration(null, loopCheck);
+    defaultConfiguration = readConfigurationAux(null, loopCheck);
   else if (!language && defaultConfiguration)
     return defaultConfiguration;
 
@@ -140,7 +161,7 @@ export function readConfiguration(language?: string, loopCheck = new Set<string>
 
       if (userConfig.inherit) {
         loopCheck.add(language);
-        template = readConfiguration(userConfig.inherit, loopCheck);
+        template = readConfigurationAux(userConfig.inherit, loopCheck);
       }
     }
   }

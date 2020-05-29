@@ -13,3 +13,7 @@ export function toast(message: string): void {
 export function showInfoMessage(message: string): void {
   window.showInformationMessage(message);
 }
+
+export function showErrorMessage(message: string): void {
+  window.showErrorMessage(message);
+}

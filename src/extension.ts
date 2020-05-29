@@ -254,8 +254,7 @@ function matchesContext(contexts: Set<String>, scope: string, category: string):
 
 function isValidDocument(document: TextDocument): boolean {
   return (document !== undefined && document.lineCount > 0 &&
-    document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output' /* &&
-        this.settings.excludedLanguages.has(document.languageId) */);
+    document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output');
 }
 
 function getEditors(document: TextDocument): TextEditor[] {
