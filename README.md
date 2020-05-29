@@ -2,7 +2,7 @@
 
 ## Code ligatures _only where you want them_, not where you don’t
 
-I enjoy using ligature fonts for coding so that symbols like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/fat_arrow_nolig.png" width="16" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow no ligature">) look like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/fat_arrow.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow ligature">) and does-not-equal signs (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/not_equal_nolig.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal no ligature">) look like the real thing from math class (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/not_equal.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal ligature">). The problem is that, even with some of the contextual smarts build into ligature fonts like Fira Code, ligatures have a knack of popping up where you don’t want them.
+I enjoy using ligature fonts for coding so that symbols like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/fat_arrow_nolig.png" width="16" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow no ligature">) look like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/fat_arrow.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow ligature">) and does-not-equal signs (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/not_equal_nolig.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal no ligature">) look like the real thing from math class (<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/not_equal.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal ligature">). The problem is that, even with some of the contextual smarts built into ligature fonts like Fira Code, ligatures have a knack of popping up where you don’t want them.
 
 <img src="https://shetline.com/readme/ligatures-limited/v1.0.0/without_suppressed_ligatures.jpg" width="407" height="67" alt="Without ligature suppression">
 <br>
@@ -61,7 +61,7 @@ In lieu of a long-winded explanation of custom settings, for now I’ll just pro
 
 ### Contexts
 
-A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `text.html.markdown` or `storage.type`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the types of language tokens within which these ligatures are embedded, and then applying the rules from your settings.
+A context is either a simplified token category, from the table below, or a TextMate grammar scope, such as `meta.paragraph` or `storage.type`. *Ligatures Limited* works by finding possible ligature sequences in your code, using TextMate to find the types of language tokens within which these ligatures are embedded, and then applying the rules from your settings.
 
 ```text
 attribute_name  attribute_value comment         comment_marker  constant
@@ -72,6 +72,12 @@ type            variable
 ```
 
 The rules for how *Ligatures Limited* handles ligatures can be summed up by the way you answer the question: “Which ligatures do I want to see, and which do I want suppressed, in which contexts and in which languages?”
+
+When you specify a TextMate scope, only the last item listed in the hover information for that scope applies. For example:
+
+<img src="https://shetline.com/readme/ligatures-limited/v1.0.0/textmate-scope.jpg" width="275" height="82" alt="TextMate scope">
+
+In the case above you would specify `meta.paragraph.markdown` to refer to this context. This can be shortened to `meta.paragraph`, and that would then apply to `meta.paragraph` in any language.
 
 ### By-language and by-context settings
 

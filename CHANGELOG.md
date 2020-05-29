@@ -1,3 +1,7 @@
+## 1.0.2
+
+* Reduced code size. Improved documentation.
+
 ## 1.0.1
 
 * Fix documentation typo.
