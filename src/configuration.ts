@@ -94,7 +94,7 @@ export function readConfiguration(language?: string): InternalConfig {
     return readConfigurationAux(language);
   }
   catch (e) {
-    showErrorMessage(e.message);
+    showErrorMessage(`Ligatures Limited configuration error: ${e.message}`);
     return FALLBACK_CONFIG;
   }
 }
