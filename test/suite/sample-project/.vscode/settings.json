@@ -20,10 +20,14 @@
         },
         "[markdown]": {
             "ligaturesByContext": {
-                "meta.paragraph": {
+                "text, punctuation": {
                     "ligatures": "X"
                 }
             }
-        }
-    }
+        },
+        "plaintext": true,
+        "css": false
+    },
+    "editor.fontFamily": "iosevka, \"Fira Code\", Monaco, 'Courier New', monospace",
+    "editor.fontSize": 14
 }

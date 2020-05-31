@@ -10,7 +10,7 @@ import fs from 'fs';
 import * as oniguruma from 'vscode-oniguruma-wasm';
 import { join } from 'path';
 import {
-  Disposable, ExtensionContext, Extension, extensions, Hover, languages, Position, TextDocument, Uri, workspace
+  Disposable, ExtensionContext, Extension, extensions, Hover, languages, Position, Range, TextDocument, Uri, workspace
 } from 'vscode';
 import { IGrammar, IRawGrammar, parseRawGrammar, Registry, RegistryOptions } from 'vscode-textmate';
 
@@ -111,35 +111,49 @@ async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
     (await languages.getLanguages())
       .filter(x => getLanguageScopeName(x) !== undefined);
 
+  allLanguages.push('plaintext');
+
   subscriptions.push(languages.registerHoverProvider(allLanguages, {
     provideHover: (doc: { uri: Uri; }, pos: Position): Hover => {
       if (!isHoverEnabled())
         return;
 
-      try {
-        const prettyDoc: DocumentController = documents.get(doc.uri);
+      const token = getScopeAt(doc as TextDocument, pos);
 
-        if (prettyDoc?.hasEditor()) {
-          const token = prettyDoc.getScopeAt(pos);
+      if (token) {
+        const text = token.text.substr(0, 64).replace(/\r\n|\r|\n/g, '↵ ') + (token.text.length > 64 ? '...' : '');
+        let scopeLines = token.scopes;
 
-          if (token) {
-            let scopeLines = token.scopes;
+        if (compactScope)
+          scopeLines = [scopeLines.join(', ')];
 
-            if (compactScope)
-              scopeLines = [scopeLines.join(', ')];
-
-            return {
-              contents: [`Token: \`${token.text}\``, `Category: \`${token.category}\``, ...scopeLines],
-              range: token.range
-            };
-          }
-        }
+        return {
+          contents: [`Token: \`${text}\``, `Category: \`${token.category}\``, ...scopeLines],
+          range: token.range
+        };
       }
-      catch (err) { }
-
-      return undefined;
     }
   }));
+}
+
+function getScopeAt(document: TextDocument, position: Position): Token {
+  if (document.languageId === 'plaintext')
+    return {
+      category: 'text',
+      range: new Range(0, 0, document.lineCount, document.lineAt(document.lineCount - 1)?.text?.length ?? 0),
+      scopes: [],
+      text: document.getText()
+    };
+
+  try {
+    const prettyDoc = documents.get(document.uri);
+
+    if (prettyDoc?.hasEditor())
+      return prettyDoc.getScopeAt(position);
+  }
+  catch (err) { }
+
+  return null;
 }
 
 export function activate(context: ExtensionContext): ScopeInfoAPI {
@@ -150,17 +164,7 @@ export function activate(context: ExtensionContext): ScopeInfoAPI {
   reloadGrammar();
 
   return {
-    getScopeAt(document: TextDocument, position: Position): Token {
-      try {
-        const prettyDoc = documents.get(document.uri);
-
-        if (prettyDoc?.hasEditor())
-          return prettyDoc.getScopeAt(position);
-      }
-      catch (err) { }
-
-      return null;
-    },
+    getScopeAt,
     getScopeForLanguage(language: string): string {
       return getLanguageScopeName(language) || null;
     },

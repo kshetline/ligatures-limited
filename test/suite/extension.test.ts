@@ -126,7 +126,9 @@ suite('Extension Tests', () => {
     this.timeout(2000);
     const decorations = await getDecorations('sample.md');
     expect(decorations).to.be.ok;
-    expect(Array.from(decorations.values()).reduce((count, range) => count + range.length, 0)).to.equal(0);
+    // After line 14 there will be suppressed ligatures inside an XML block
+    expect(Array.from(decorations.values()).reduce((count, ranges) => count +
+      ranges.reduce((count2, range) => count2 + (range.start.line < 14 ? 1 : 0), 0), 0)).to.equal(0);
   });
 
   it('should find debug ligatures in TypeScript document', async function () {

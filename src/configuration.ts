@@ -10,7 +10,7 @@ interface LLConfiguration {
   debug?: boolean;
   disregardedLigatures: string | string[];
   inherit?: string;
-  languages: Record<string, LLConfiguration>;
+  languages: Record<string, LLConfiguration | boolean>;
   ligatures?: string | string[];
   ligaturesByContext: Record<string, string | string[] | {
     debug: boolean,
@@ -47,13 +47,51 @@ const FALLBACK_CONFIG: InternalConfig = {
 
 const baseLigatures = String.raw`
 
-.= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
-=>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
-<||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
-;; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0xF 9x9
--~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(
+  .= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
+  =>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
+  <||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
+  ;; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0xF 9x9
+  -~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(
+  <==== ==== ====> <====> <--- ---> <---> <~~~ ~~~> <~~~>
 
 `.trim().split(/\s+/);
+
+/* eslint-disable quote-props */
+const patternSubstitutions: any = {
+  '<====': '<={4,}',
+  '====': '={4,}',
+  '====>': '={4,}>',
+  '<====>': '<={4,}>',
+  '===': '(?<!=)===(?!=)',
+  '==': '(?<!=)==(?!=)',
+  '<=': '<=(?!=)',
+  '=>': '(?<!=)=>',
+  '<---': '<-{3,}',
+  '--->': '-{3,}>',
+  '<--->': '<-{3,}>',
+  '--': '(?<!-)--(?!-)',
+  '<-': '<-(?!-)',
+  '->': '(?<!-)->',
+  '<~~~': '<~{3,}',
+  '~~~>': '~{3,}>',
+  '<~~~>': '<~{3,}>',
+  '~~': '(?<!~)~~(?!~)',
+  '<~': '<~(?!~)',
+  '~>': '(?<!~)~>',
+  '!=': '!=(?!=)',
+  '###': '(?<!#)###(?!#)',
+  '##': '(?<!#)##(?!#)',
+  '<<': '(?<!<)<<(?!<)',
+  '>>': '(?<!>)>>(?!>)',
+  '/*': '\\/\\*(?!\\*)',
+  '*/': '(?<!\\*)\\*\\/',
+  '***': '(?<!\\*)\\*\\*\\*(?!\\*)',
+  '**': '(?<!\\*)\\*\\*(?!\\*)',
+  '0xF': '0x[0-9a-fA-F]',
+  '9x9': '\\dx\\d',
+  'www': '\\bwww\\b'
+};
+/* eslint-enable quote-props */
 
 const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '9x9']);
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
@@ -89,24 +127,28 @@ export function getLigatureMatcher(): RegExp {
   return globalMatchLigatures;
 }
 
-export function readConfiguration(language?: string): InternalConfig {
+export function readConfiguration(): InternalConfig;
+export function readConfiguration(language: string): InternalConfig | boolean;
+
+export function readConfiguration(language?: string): InternalConfig | boolean {
   try {
     return readConfigurationAux(language);
   }
   catch (e) {
+    console.error(e);
     showErrorMessage(`Ligatures Limited configuration error: ${e.message}`);
-    return FALLBACK_CONFIG;
+    return language ? true : FALLBACK_CONFIG;
   }
 }
 
-function readConfigurationAux(language?: string, loopCheck = new Set<string>()): InternalConfig {
+function readConfigurationAux(language?: string, loopCheck = new Set<string>()): InternalConfig | boolean {
   if (language && !defaultConfiguration)
-    defaultConfiguration = readConfigurationAux(null, loopCheck);
+    defaultConfiguration = readConfigurationAux(null, loopCheck) as InternalConfig;
   else if (!language && defaultConfiguration)
     return defaultConfiguration;
 
-  let userConfig: LLConfiguration;
-  let template: InternalConfig;
+  let userConfig: LLConfiguration | boolean;
+  let template: InternalConfig | boolean;
 
   if (language) {
     if (configurationsByLanguage.has(language))
@@ -128,13 +170,15 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     let languageConfig = languages && languages[languageMap.get(language) ?? ''];
     let prefix = '';
 
-    if (!languageConfig) {
+    if (languageConfig == null) {
       languageConfig = workspace.getConfiguration().get(`[${language}]`);
       prefix = 'ligaturesLimited.';
     }
 
-    if (languageConfig) {
-      const config = languageConfig.ligaturesLimited || {};
+    if (typeof languageConfig === 'boolean')
+      userConfig = languageConfig;
+    else if (languageConfig) {
+      const config = languageConfig.ligaturesLimited ?? {};
 
       config.compactScopeDisplay = languageConfig[`${prefix}compactScopeDisplay`] ?? config.compactScopeDisplay;
       config.contexts = languageConfig[`${prefix}contexts`] ?? config.contexts;
@@ -156,7 +200,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
       });
     }
 
-    if (userConfig) {
+    if (userConfig && !(typeof userConfig === 'boolean')) {
       template = defaultConfiguration;
 
       if (userConfig.inherit) {
@@ -172,12 +216,17 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     disregarded.forEach(l => globalLigatures.delete(l));
   }
 
-  if (!userConfig) {
+  if (userConfig == null) {
     userConfig = workspace.getConfiguration().get('ligaturesLimited');
 
-    if (userConfig?.inherit && !language)
+    if (!(typeof userConfig === 'boolean') && userConfig?.inherit && !language)
       throw new Error('"inherit" is not a valid property for the root ligaturesLimited configuration.');
   }
+
+  if (typeof userConfig === 'boolean')
+    return userConfig;
+  else if (typeof template === 'boolean')
+    return template;
 
   if (!template) {
     template = {
@@ -244,7 +293,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
 
   allLigatures.sort((a, b) => b.length - a.length); // Sort from longest to shortest
   globalMatchLigatures = new RegExp(allLigatures.map(lg =>
-    lg.replace(escapeRegex, '\\$&').replace('0xF', '0x[0-9a-fA-F]').replace('9x9', '\\dx\\d')
+    patternSubstitutions[lg] ?? lg.replace(escapeRegex, '\\$&')
   ).join('|'), 'g');
 
   if (!language)
