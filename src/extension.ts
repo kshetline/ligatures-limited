@@ -145,6 +145,7 @@ export function activate(context: ExtensionContext): void {
           let langConfig = docLangConfig;
           let suppress: boolean;
           let debug: boolean;
+          let selectionMode: SelectionMode;
 
           if (language !== docLanguage) {
             langConfig = (lastTokenConfig && lastTokenLanguage === language) ? lastTokenConfig :
@@ -154,9 +155,11 @@ export function activate(context: ExtensionContext): void {
           if (typeof langConfig === 'boolean') {
             suppress = !langConfig;
             debug = globalDebug;
+            selectionMode = readConfiguration().selectionMode;
           }
           else {
-            const selectionMode = selectionModeOverride ?? langConfig.selectionMode;
+            selectionMode = selectionModeOverride ?? langConfig.selectionMode;
+
             const langLigatures = langConfig.ligatures;
             const contexts = langConfig.contexts;
             const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
@@ -178,27 +181,27 @@ export function activate(context: ExtensionContext): void {
                 category = 'number';
             }
 
-            if (selectionMode !== 'off' && editor.selections?.length > 0 &&
-                (isInsert(editor.selections, i, index, ligature.length) || selectionMode !== 'cursor')) {
-              const range = selectionMode === 'line' ?
-                new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
-
-              for (let j = 0; j < editor.selections.length && !selected; ++j) {
-                const selection = editor.selections[j];
-
-                selected = !!selection.intersection(range);
-              }
-            }
-
             const contextConfig = findContextConfig(langConfig, specificScope, category);
             const contextLigatures = contextConfig?.ligatures ?? langLigatures;
             const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
 
             debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
-            suppress = shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category);
+            suppress = shortened || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category);
           }
 
-          if (suppress) {
+          if (selectionMode !== 'off' && editor.selections?.length > 0 &&
+              (isInsert(editor.selections, i, index, ligature.length) || selectionMode !== 'cursor')) {
+            const range = selectionMode === 'line' ?
+              new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
+
+            for (let j = 0; j < editor.selections.length && !selected; ++j) {
+              const selection = editor.selections[j];
+
+              selected = !!selection.intersection(range);
+            }
+          }
+
+          if (suppress || selected) {
             for (let j = 0; j < ligature.length; ++j)
               (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
           }

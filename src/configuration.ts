@@ -62,37 +62,19 @@ const patternSubstitutions: any = {
   '====': '={4,}',
   '====>': '={4,}>',
   '<====>': '<={4,}>',
-  '===': '(?<!=)===(?!=)',
-  '==': '(?<!=)==(?!=)',
-  '<=': '<=(?!=)',
-  '=>': '(?<!=)=>',
   '<---': '<-{3,}',
   '--->': '-{3,}>',
   '<--->': '<-{3,}>',
-  '--': '(?<!-)--(?!-)',
-  '<-': '<-(?!-)',
-  '->': '(?<!-)->',
   '<~~~': '<~{3,}',
   '~~~>': '~{3,}>',
   '<~~~>': '<~{3,}>',
-  '~~': '(?<!~)~~(?!~)',
-  '<~': '<~(?!~)',
-  '~>': '(?<!~)~>',
-  '!=': '!=(?!=)',
-  '###': '(?<!#)###(?!#)',
-  '##': '(?<!#)##(?!#)',
-  '<<': '(?<!<)<<(?!<)',
-  '>>': '(?<!>)>>(?!>)',
-  '/*': '\\/\\*(?!\\*)',
-  '*/': '(?<!\\*)\\*\\/',
-  '***': '(?<!\\*)\\*\\*\\*(?!\\*)',
-  '**': '(?<!\\*)\\*\\*(?!\\*)',
   '0xF': '0x[0-9a-fA-F]',
   '9x9': '\\dx\\d',
   'www': '\\bwww\\b'
 };
 /* eslint-enable quote-props */
 
+let disregarded: string[] = [];
 const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '9x9']);
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
 const baseLigaturesByContext = {
@@ -110,10 +92,10 @@ const configurationsByLanguage = new Map<string, InternalConfig>();
 let globalLigatures: Set<string>;
 let globalMatchLigatures: RegExp;
 
-// The \ before the second [ is considered unnecessary here by ESLine, but being left out
-// is an error for some regex parsers.
+// The \ escape before the second [ is considered unnecessary here by ESLint,
+// but being left out is an error for some regex parsers.
 // eslint-disable-next-line no-useless-escape
-const escapeRegex = /[-\[\]/{}()*+?.\\^$|]/g;
+const charsNeedingRegexEscape = /[-\[\]/{}()*+?.\\^$|]/g;
 
 export function resetConfiguration(): void {
   defaultConfiguration = undefined;
@@ -210,8 +192,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     }
   }
   else {
-    const disregarded = toStringArray(workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures'));
-
+    disregarded = toStringArray(workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures'));
     globalLigatures = new Set(baseLigatures);
     disregarded.forEach(l => globalLigatures.delete(l));
   }
@@ -292,8 +273,8 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
   const allLigatures = Array.from(globalLigatures);
 
   allLigatures.sort((a, b) => b.length - a.length); // Sort from longest to shortest
-  globalMatchLigatures = new RegExp(allLigatures.map(lg =>
-    patternSubstitutions[lg] ?? lg.replace(escapeRegex, '\\$&')
+  globalMatchLigatures = new RegExp(allLigatures.map(lig =>
+    patternSubstitutions[lig] ?? generatePattern(lig)
   ).join('|'), 'g');
 
   if (!language)
@@ -302,6 +283,69 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     configurationsByLanguage.set(language, internalConfig);
 
   return internalConfig;
+}
+
+// The major purpose of this function is escaping ligature characters so that they
+// can be used in a regex, but for some ligatures it's also important to make sure
+// certain characters don't precede or follow a ligature to establish a valid match.
+function generatePattern(ligature: string): string {
+  const leadingSet = new Set<string>();
+  const trailingSet = new Set<string>();
+  const len = ligature.length;
+
+  for (const other of disregarded) {
+    if (other.length <= len)
+      break;
+
+    let index = 0;
+
+    while ((index = other.indexOf(ligature, index)) >= 0) {
+      if (index > 0)
+        leadingSet.add(other.charAt(index - 1));
+
+      if (index + len < other.length)
+        trailingSet.add(other.charAt(index + len));
+
+      ++index;
+    }
+  }
+
+  const leading = createLeadingOrTrailingClass(leadingSet);
+  const trailing = createLeadingOrTrailingClass(trailingSet);
+  let pattern = '';
+
+  if (leading) // Create negative lookbehind, so this ligature isn't matched if preceded by these characters.
+    pattern += `(?<!${leading})`;
+
+  pattern += escapeForRegex(ligature);
+
+  if (trailing) // Create negative lookahead, so this ligature isn't matched if followed by these characters.
+    pattern += `(?!${trailing})`;
+
+  return pattern;
+}
+
+function createLeadingOrTrailingClass(set: Set<string>): string {
+  if (set.size === 0)
+    return '';
+  else if (set.size === 1)
+    return escapeForRegex(set.values().next().value);
+
+  let klass = '[';
+
+  // If present, dash (`-`) must go first, in case it's the start of a [] class pattern
+  if (set.has('-')) {
+    klass += '-';
+    set.delete('-');
+  }
+
+  Array.from(set.values()).forEach(c => klass += escapeForRegex(c));
+
+  return klass + ']';
+}
+
+function escapeForRegex(s: string): string {
+  return s.replace(charsNeedingRegexEscape, '\\$&');
 }
 
 function toStringArray(s: string | string[], allowComma = false): string[] {
