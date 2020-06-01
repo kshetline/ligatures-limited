@@ -1,8 +1,9 @@
 ## 1.1.0
 
-* Support for new indefinite-length ligatures.
+* Support for indefinite-length arrow ligatures (as available in the Iosevka font).
 * Optional simple true/false settings to completely enable, or completely suppress, all ligatures in all contexts for a given language.
 * Handles language-specific fenced code blocks in Markdown as the specified language.
+* For any font which may provide such, support for octal (`0o7`) and binary (`0b1`) number prefix ligatures, similar to the `0xF` hexadecimal prefix ligature previously supported.
 
 ## 1.0.2
 

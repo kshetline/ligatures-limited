@@ -1,33 +1,24 @@
 {
-    "ligaturesLimited.languages": {
-        "css, javascript": {
-            "ligaturesByContext": {
-                "comment.block": {
-                    "ligatures": "0 www"
-                }
-            }
-        },
-        "html": {
-            "ligaturesByContext": {
-                "attribute_value": {
-                    "ligatures": "0 www"
-                }
-            }
-        },
-        "typescript": {
-            "inherit": "javascript",
-            "ligatures": "- !="
-        },
-        "[markdown]": {
-            "ligaturesByContext": {
-                "text, punctuation": {
-                    "ligatures": "X"
-                }
-            }
-        },
-        "plaintext": true,
-        "css": false
+  "ligaturesLimited.languages": {
+    "css, javascript": {
+      "ligaturesByContext": {
+        "comment.block": {
+          "ligatures": "0 www"
+        }
+      }
     },
-    "editor.fontFamily": "iosevka, \"Fira Code\", Monaco, 'Courier New', monospace",
-    "editor.fontSize": 14
+    "html": {
+      "ligaturesByContext": {
+        "attribute_value": {
+          "ligatures": "0 www"
+        }
+      }
+    },
+    "typescript": {
+      "inherit": "javascript",
+      "ligatures": "- !="
+    },
+    "markdown": true,
+    "plaintext, json, jsonc, json5": false
+  }
 }

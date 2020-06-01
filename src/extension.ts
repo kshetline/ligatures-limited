@@ -172,9 +172,10 @@ export function activate(context: ExtensionContext): void {
               ligature = ligature.substr(0, scope.text.length);
             }
 
-            // 0x followed by a hex digit as a special case: the 0x part might be the lead-in to a numeric constant,
+            // 0x followed by a hex digit is a special case: the 0x part might be the lead-in to a numeric constant,
             // but treated as a separate keyword.
-            if (/^0x[0-9a-f]$/i.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
+            // The same applies to 0o followed by an octal digit, or 0b followed by a binary digit.
+            if (/^0(x[0-9a-fA-F]|o[0-7]|b[01])$/.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
               const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
 
               if (nextScope.category === 'number')

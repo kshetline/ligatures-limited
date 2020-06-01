@@ -152,5 +152,13 @@ suite('Extension Tests', () => {
     expect(isCorrectlyDecorated(decorations, 9, 29, 2, breakDebug), 'ts !=').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 10, 19, 2, highlightLigature), 'ts =>').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 12, 15, 3, highlightLigature), 'ts =>').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 12, 20, 3, highlightLigature), 'ts =>').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 12, 26, 3, highlightLigature), 'ts =>').to.be.ok;
+
+    expect(isCorrectlyDecorated(decorations, 13, 16, 3, highlightLigature), 'ts =>').to.not.be.ok;
+    expect(isCorrectlyDecorated(decorations, 13, 21, 3, highlightLigature), 'ts =>').to.not.be.ok;
+    expect(isCorrectlyDecorated(decorations, 13, 27, 3, highlightLigature), 'ts =>').to.not.be.ok;
   });
 });

@@ -50,8 +50,8 @@ const baseLigatures = String.raw`
   .= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
   =>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
   <||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
-  ;; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl 0xF 9x9
-  -~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_(
+  ;; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl
+  -~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_( 9x9 0xF 0o7 0b1
   <==== ==== ====> <====> <--- ---> <---> <~~~ ~~~> <~~~>
 
 `.trim().split(/\s+/);
@@ -69,13 +69,15 @@ const patternSubstitutions: any = {
   '~~~>': '~{3,}>',
   '<~~~>': '<~{3,}>',
   '0xF': '0x[0-9a-fA-F]',
+  '0o7': '0o[0-7]',
+  '0b1': '0b[01]',
   '9x9': '\\dx\\d',
   'www': '\\bwww\\b'
 };
 /* eslint-enable quote-props */
 
 let disregarded: string[] = [];
-const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '9x9']);
+const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '0o7', '0b1', '9x9']);
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
 const baseLigaturesByContext = {
   number: {
@@ -86,6 +88,8 @@ const baseLigaturesByContext = {
 };
 
 baseLigaturesByContext.number.ligatures.delete('0xF');
+baseLigaturesByContext.number.ligatures.delete('0o7');
+baseLigaturesByContext.number.ligatures.delete('0b1');
 
 let defaultConfiguration: InternalConfig;
 const configurationsByLanguage = new Map<string, InternalConfig>();
