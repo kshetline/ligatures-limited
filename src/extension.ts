@@ -126,7 +126,7 @@ export function activate(context: ExtensionContext): void {
       const docLanguage = document.languageId;
       const docLangConfig = readConfiguration(docLanguage);
       let lastTokenLanguage: string;
-      let lastTokenConfig: InternalConfig;
+      let lastTokenConfig: InternalConfig | boolean;
       const matcher = getLigatureMatcher();
 
       for (let i = first; i <= last; ++i) {
@@ -143,32 +143,51 @@ export function activate(context: ExtensionContext): void {
           const specificScope = _last(scope.scopes);
           const language = getTokenLanguage(docLanguage, specificScope);
           let langConfig = docLangConfig;
+          let suppress: boolean;
+          let debug: boolean;
+          let selectionMode: SelectionMode;
 
           if (language !== docLanguage) {
             langConfig = (lastTokenConfig && lastTokenLanguage === language) ? lastTokenConfig :
               lastTokenConfig = readConfiguration(lastTokenLanguage = language);
           }
 
-          const selectionMode = selectionModeOverride ?? langConfig.selectionMode;
-          const langLigatures = langConfig.ligatures;
-          const contexts = langConfig.contexts;
-          const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
-
-          // Did the matched ligature overshoot a token boundary?
-          if (ligature.length > scope.text.length &&
-              !bleedThroughs.has(ligature) && !(category === 'string' && ligature === '\\\\\\')) {
-            shortened = true;
-            matcher.lastIndex -= ligature.length - scope.text.length;
-            ligature = ligature.substr(0, scope.text.length);
+          if (typeof langConfig === 'boolean') {
+            suppress = !langConfig;
+            debug = globalDebug;
+            selectionMode = readConfiguration().selectionMode;
           }
+          else {
+            selectionMode = selectionModeOverride ?? langConfig.selectionMode;
 
-          // 0x followed by a hex digit as a special case: the 0x part might be the lead-in to a numeric constant,
-          // but treated as a separate keyword.
-          if (/^0x[0-9a-f]$/i.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
-            const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
+            const langLigatures = langConfig.ligatures;
+            const contexts = langConfig.contexts;
+            const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
 
-            if (nextScope.category === 'number')
-              category = 'number';
+            // Did the matched ligature overshoot a token boundary?
+            if (ligature.length > scope.text.length &&
+                !bleedThroughs.has(ligature) && !(category === 'string' && ligature === '\\\\\\')) {
+              shortened = true;
+              matcher.lastIndex -= ligature.length - scope.text.length;
+              ligature = ligature.substr(0, scope.text.length);
+            }
+
+            // 0x followed by a hex digit is a special case: the 0x part might be the lead-in to a numeric constant,
+            // but treated as a separate keyword.
+            // The same applies to 0o followed by an octal digit, or 0b followed by a binary digit.
+            if (/^0(x[0-9a-fA-F]|o[0-7]|b[01])$/.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
+              const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
+
+              if (nextScope.category === 'number')
+                category = 'number';
+            }
+
+            const contextConfig = findContextConfig(langConfig, specificScope, category);
+            const contextLigatures = contextConfig?.ligatures ?? langLigatures;
+            const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
+
+            debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
+            suppress = shortened || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category);
           }
 
           if (selectionMode !== 'off' && editor.selections?.length > 0 &&
@@ -183,12 +202,7 @@ export function activate(context: ExtensionContext): void {
             }
           }
 
-          const contextConfig = findContextConfig(langConfig, specificScope, category);
-          const contextLigatures = contextConfig?.ligatures ?? langLigatures;
-          const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
-          const debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
-
-          if (shortened || selected || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category)) {
+          if (suppress || selected) {
             for (let j = 0; j < ligature.length; ++j)
               (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
           }
@@ -215,7 +229,7 @@ export function activate(context: ExtensionContext): void {
 function getTokenLanguage(docLanguage: string, scope: string): string {
   const suffix = (/\.([^.]+)$/.exec(scope) ?? [])[1];
 
-  if (!suffix || !/^(html|xhtml|xml)$/.test(docLanguage))
+  if (!suffix || !/^(html|markdown|xhtml|xml)$/.test(docLanguage))
     return docLanguage;
 
   switch (suffix) {

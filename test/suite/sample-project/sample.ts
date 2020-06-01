@@ -8,4 +8,7 @@ export function foo(): void {
   // eslint-disable-next-line eqeqeq
   if (a <= b && a >= c && b != c)
     setTimeout(() => console.log('a <= b && a << c && b != c'));
+
+  console.log(0xA, 0o65, 0b1011);
+  console.log('0xA, 0o65, 0b1011');
 }
