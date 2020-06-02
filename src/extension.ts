@@ -4,10 +4,13 @@
 // This extension also replicates (and expands) the functionality provided by
 // vscode-Disable-Ligatures.
 
-import { ContextConfig, getLigatureMatcher, InternalConfig, readConfiguration, resetConfiguration, SelectionMode } from './configuration';
+import {
+  ContextConfig, DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_LINES, getLigatureMatcher, InternalConfig, readConfiguration,
+  resetConfiguration, SelectionMode
+} from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
-import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
+import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
 
 export const breakNormal = window.createTextEditorDecorationType({ color: '' });
@@ -16,12 +19,21 @@ export const highlightLigature = window.createTextEditorDecorationType({ color: 
 export const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
 export const ligatureDecorations = [breakNormal, breakDebug, highlightLigature, allLigatures];
 
+const MAX_TIME_FOR_PROCESSING_LINES = 100;
+const PROCESS_YIELD_TIME = 50;
+const WAIT_FOR_PARSE_RETRY_TIME = 250;
+const MAX_PARSE_RETRY_ATTEMPTS = 5;
+
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
 let globalDebug: boolean = null;
 let selectionModeOverride: SelectionMode = null;
 const selectionModes: SelectionMode[] = [null, 'off', 'cursor', 'line', 'selection'];
 let currentDocument: TextDocument;
 let ligatureSuppression = true;
+let maxLines = DEFAULT_MAX_LINES;
+let maxFileSize = DEFAULT_MAX_FILE_SIZE;
+const maxSizeWarningFiles = new Set<TextDocument>();
+let globalMaxSizeWarningEnabled = true;
 
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
@@ -32,7 +44,12 @@ export function activate(context: ExtensionContext): void {
 
   workspace.onDidChangeConfiguration(() => {
     resetConfiguration();
-    selectionModeOverride = readConfiguration().selectionMode;
+
+    const config = readConfiguration();
+
+    maxFileSize = config.maxFileSize;
+    maxLines = config.maxLines;
+    selectionModeOverride = config.selectionMode;
     reloadGrammar();
     init();
   }, null, context.subscriptions);
@@ -54,6 +71,10 @@ export function activate(context: ExtensionContext): void {
 
   workspace.onDidOpenTextDocument(document => {
     reviewDocument(document);
+  });
+
+  workspace.onDidCloseTextDocument(document => {
+    maxSizeWarningFiles.delete(document);
   });
 
   selectionModeOverride = readConfiguration().selectionMode;
@@ -95,8 +116,8 @@ export function activate(context: ExtensionContext): void {
       reviewDocument(currentDocument);
   }
 
-  function reviewDocument(document: TextDocument, attempt = 1): void {
-    if (attempt > 5)
+  function reviewDocument(document: TextDocument, attempt = 1, first = 0, last = document.lineCount - 1): void {
+    if (attempt > MAX_PARSE_RETRY_ATTEMPTS)
       return;
 
     const editors = getEditors(document);
@@ -107,11 +128,11 @@ export function activate(context: ExtensionContext): void {
     currentDocument = document;
 
     if (!scopeInfoApi.getScopeAt(document, new Position(0, 0))) {
-      setTimeout(() => reviewDocument(document, ++attempt), 250);
+      setTimeout(() => reviewDocument(document, ++attempt, first, last), WAIT_FOR_PARSE_RETRY_TIME);
       return;
     }
 
-    editors.forEach(editor => lookForLigatures(document, editor, 0, document.lineCount - 1));
+    editors.forEach(editor => lookForLigatures(document, editor, first, last));
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
@@ -121,7 +142,20 @@ export function activate(context: ExtensionContext): void {
 
     const background: Range[] = [];
 
-    if (ligatureSuppression) {
+    if (document.lineCount > maxLines || document.getText().length > maxFileSize) {
+      if (globalMaxSizeWarningEnabled && !maxSizeWarningFiles.has(document)) {
+        const option1 = "Don't warn again for this document.";
+        const option2 = "Don't warn again this session.";
+        window.showWarningMessage('Because of file size, all ligatures in this document will be displayed.',
+          option1, option2).then(selection => {
+          if (selection === option1)
+            maxSizeWarningFiles.add(document);
+          else if (selection === option2)
+            globalMaxSizeWarningEnabled = false;
+        });
+      }
+    }
+    else if (ligatureSuppression) {
       const started = processMillis();
       const docLanguage = document.languageId;
       const docLangConfig = readConfiguration(docLanguage);
@@ -210,8 +244,8 @@ export function activate(context: ExtensionContext): void {
             highlights.push(new Range(i, index, i, index + ligature.length));
         }
 
-        if (processMillis() > started + 50_000_000) {
-          setTimeout(() => lookForLigatures(document, editor, i + 1, last, breaks, debugBreaks, highlights), 50);
+        if (processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
+          setTimeout(() => lookForLigatures(document, editor, i + 1, last, breaks, debugBreaks, highlights), PROCESS_YIELD_TIME);
           return;
         }
       }
@@ -227,17 +261,12 @@ export function activate(context: ExtensionContext): void {
 }
 
 function getTokenLanguage(docLanguage: string, scope: string): string {
-  const suffix = (/\.([^.]+)$/.exec(scope) ?? [])[1];
+  const id = (/^.+\.(.+)$/.exec(scope) ?? [])[1];
 
-  if (!suffix || !/^(html|markdown|xhtml|xml)$/.test(docLanguage))
+  if (!id || !/^(html|markdown|xhtml|xml)$/.test(docLanguage))
     return docLanguage;
 
-  switch (suffix) {
-    case 'js': return 'javascript';
-    case 'css': return 'css';
-  }
-
-  return docLanguage;
+  return getLanguageIdFromScope(scope) ?? docLanguage;
 }
 
 function findContextConfig(config: InternalConfig, scope: string, category: string): ContextConfig {
