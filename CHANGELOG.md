@@ -1,3 +1,8 @@
+## 1.2.0
+
+* Fix problem of unresponsive behavior with large files.
+* There is now configurable maximum document size (default 2,000,000 characters) and maximum line count (default 50,000 lines) for handling ligatures, above which _Ligatures Limited_ will leave a document as is.
+
 ## 1.1.0
 
 * Support for indefinite-length arrow ligatures (as available in the Iosevka font).

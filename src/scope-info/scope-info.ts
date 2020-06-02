@@ -47,19 +47,48 @@ interface ExtensionPackage {
 }
 
 let compactScope = true;
+const languageIds = new Map<string, string>();
+
+function getLanguages(): ExtensionGrammar[] {
+  try {
+    return extensions.all
+      .filter(x => x.packageJSON && x.packageJSON.contributes && x.packageJSON.contributes.grammars)
+      .reduce((a: ExtensionGrammar[], b) => [...a, ...(b.packageJSON as ExtensionPackage).contributes.grammars], []);
+  }
+  catch {}
+
+  return [];
+}
+
+export function getLanguageIdFromScope(scope: string): string {
+  const id = (/^.+\.(.+)$/.exec(scope) ?? [])[1];
+
+  if (!id)
+    return undefined;
+
+  if (languageIds.has(id))
+    return languageIds.get(id);
+
+  const suffix = '.' + id;
+  const extLanguages = getLanguages();
+
+  for (const language of extLanguages) {
+    if (language.language && language.scopeName?.endsWith(suffix)) {
+      languageIds[id] = language.language;
+
+      return language.language;
+    }
+  }
+
+  return undefined;
+}
 
 function getLanguageScopeName(languageId: string): string {
-  try {
-    const extLanguages =
-      extensions.all
-        .filter(x => x.packageJSON && x.packageJSON.contributes && x.packageJSON.contributes.grammars)
-        .reduce((a: ExtensionGrammar[], b) => [...a, ...(b.packageJSON as ExtensionPackage).contributes.grammars], []);
-    const matchingLanguages = extLanguages.filter(g => g.language === languageId);
+  const extLanguages = getLanguages();
+  const matchingLanguages = extLanguages.filter(g => g.language === languageId);
 
-    if (matchingLanguages.length > 0)
-      return matchingLanguages[0].scopeName;
-  }
-  catch (err) { }
+  if (matchingLanguages.length > 0)
+    return matchingLanguages[0].scopeName;
 
   return undefined;
 }
