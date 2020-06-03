@@ -3,6 +3,8 @@ import { workspace } from 'vscode';
 import { showErrorMessage } from './extension-util';
 
 export type SelectionMode = 'cursor' | 'line' | 'off' | 'selection';
+export const DEFAULT_MAX_LINES = 20_000;
+export const DEFAULT_MAX_FILE_SIZE = 35_000_000;
 
 interface LLConfiguration {
   compactScopeDisplay?: boolean;
@@ -16,6 +18,8 @@ interface LLConfiguration {
     debug: boolean,
     ligatures: string | string[]
   }>;
+  maxFileSize: number,
+  maxLines: number;
   selectionMode?: SelectionMode;
 }
 
@@ -30,9 +34,11 @@ export interface InternalConfig {
   contexts: Set<string>;
   debug: boolean;
   ligatures: Set<string>;
-  ligaturesListedAreEnabled: boolean;
-  selectionMode: SelectionMode;
   ligaturesByContext: Record<string, ContextConfig>;
+  ligaturesListedAreEnabled: boolean;
+  maxFileSize: number,
+  maxLines: number,
+  selectionMode: SelectionMode;
 }
 
 const FALLBACK_CONFIG: InternalConfig = {
@@ -40,9 +46,11 @@ const FALLBACK_CONFIG: InternalConfig = {
   contexts: new Set<string>(),
   debug: false,
   ligatures: new Set<string>(),
+  ligaturesByContext: {},
   ligaturesListedAreEnabled: false,
-  selectionMode: 'cursor',
-  ligaturesByContext: {}
+  maxFileSize: DEFAULT_MAX_FILE_SIZE,
+  maxLines: DEFAULT_MAX_LINES,
+  selectionMode: 'cursor'
 };
 
 const baseLigatures = String.raw`
@@ -157,7 +165,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     let prefix = '';
 
     if (languageConfig == null) {
-      languageConfig = workspace.getConfiguration().get(`[${language}]`);
+      languageConfig = workspace.getConfiguration(null, null).get(`[${language}]`);
       prefix = 'ligaturesLimited.';
     }
 
@@ -219,9 +227,11 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
       contexts: baseLigatureContexts,
       debug: false,
       ligatures: new Set(baseDisabledLigatures),
+      ligaturesByContext: baseLigaturesByContext,
       ligaturesListedAreEnabled: false,
-      selectionMode: 'cursor' as SelectionMode,
-      ligaturesByContext: baseLigaturesByContext
+      maxFileSize: DEFAULT_MAX_FILE_SIZE,
+      maxLines: DEFAULT_MAX_LINES,
+      selectionMode: 'cursor' as SelectionMode
     };
   }
 
@@ -230,9 +240,11 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     contexts: new Set(template.contexts),
     debug: userConfig?.debug ?? template.debug,
     ligatures: new Set(template.ligatures),
+    ligaturesByContext: clone(template.ligaturesByContext),
     ligaturesListedAreEnabled: template.ligaturesListedAreEnabled,
-    selectionMode: (userConfig?.selectionMode?.toLowerCase() ?? template.selectionMode) as SelectionMode,
-    ligaturesByContext: clone(template.ligaturesByContext)
+    maxFileSize: userConfig?.maxFileSize ?? template.maxFileSize,
+    maxLines: userConfig?.maxLines ?? template.maxLines,
+    selectionMode: (userConfig?.selectionMode?.toLowerCase() ?? template.selectionMode) as SelectionMode
   };
 
   if (!/^(cursor|line|off|selection)$/.test(internalConfig.selectionMode))

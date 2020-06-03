@@ -4,10 +4,13 @@
 // This extension also replicates (and expands) the functionality provided by
 // vscode-Disable-Ligatures.
 
-import { ContextConfig, getLigatureMatcher, InternalConfig, readConfiguration, resetConfiguration, SelectionMode } from './configuration';
+import {
+  ContextConfig, DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_LINES, getLigatureMatcher, InternalConfig, readConfiguration,
+  resetConfiguration, SelectionMode
+} from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
-import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, reloadGrammar } from './scope-info/scope-info';
+import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
 
 export const breakNormal = window.createTextEditorDecorationType({ color: '' });
@@ -16,12 +19,30 @@ export const highlightLigature = window.createTextEditorDecorationType({ color: 
 export const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
 export const ligatureDecorations = [breakNormal, breakDebug, highlightLigature, allLigatures];
 
+const MAX_TIME_FOR_PROCESSING_LINES = 100;
+const PROCESS_YIELD_TIME = 50;
+const WAIT_FOR_PARSE_RETRY_TIME = 250;
+const MAX_PARSE_RETRY_ATTEMPTS = 5;
+
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
 let globalDebug: boolean = null;
 let selectionModeOverride: SelectionMode = null;
 const selectionModes: SelectionMode[] = [null, 'off', 'cursor', 'line', 'selection'];
 let currentDocument: TextDocument;
 let ligatureSuppression = true;
+let maxLines = DEFAULT_MAX_LINES;
+let maxFileSize = DEFAULT_MAX_FILE_SIZE;
+const maxSizeWarningFiles = new Set<TextDocument>();
+let globalMaxSizeWarningEnabled = true;
+
+const inProgress = new Map<TextDocument, { first: number, last: number }>();
+const savedSelections = new Map<TextDocument, Selection[]>();
+const savedRanges = new Map<TextDocument, {
+  breaks: Range[],
+  debugBreaks: Range[],
+  highlights: Range[],
+  background: Range[]
+}>();
 
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
@@ -32,7 +53,12 @@ export function activate(context: ExtensionContext): void {
 
   workspace.onDidChangeConfiguration(() => {
     resetConfiguration();
-    selectionModeOverride = readConfiguration().selectionMode;
+
+    const config = readConfiguration();
+
+    maxFileSize = config.maxFileSize;
+    maxLines = config.maxLines;
+    selectionModeOverride = config.selectionMode;
     reloadGrammar();
     init();
   }, null, context.subscriptions);
@@ -43,8 +69,46 @@ export function activate(context: ExtensionContext): void {
   });
 
   window.onDidChangeTextEditorSelection(event => {
-    if (window.visibleTextEditors.includes(event.textEditor))
-      reviewDocument(event.textEditor.document);
+    if (window.visibleTextEditors.includes(event.textEditor)) {
+      const doc = event.textEditor.document;
+      const ranges = savedRanges.get(doc);
+      const lastSelections = savedSelections.get(doc);
+
+      savedSelections.set(doc, Array.from(event.selections));
+
+      if (ranges && ranges.background.length === 0) {
+        let first = doc.lineCount;
+        let last = -1;
+        const findSelectionBounds = (s: Selection) => {
+          first = Math.min(s.anchor.line, s.active.line, first);
+          last = Math.max(s.anchor.line, s.active.line, last);
+        };
+        const clearOldRanges = (r: Range[]) => {
+          for (let i = 0; i < r.length; ++i) {
+            const line = r[i].start.line;
+
+            if (first <= line && line <= last)
+              r.splice(i--, 1);
+          }
+        };
+
+        event.selections.forEach(findSelectionBounds);
+
+        if (lastSelections)
+          lastSelections.forEach(findSelectionBounds);
+
+        clearOldRanges(ranges.breaks);
+        clearOldRanges(ranges.debugBreaks);
+        clearOldRanges(ranges.highlights);
+        reviewDocument(doc, 0, first, last, ranges.breaks, ranges.debugBreaks, ranges.highlights);
+      }
+      else {
+        savedSelections.delete(doc);
+        reviewDocument(doc);
+      }
+    }
+    else if (event.textEditor.document)
+      savedSelections.delete(event.textEditor.document);
   });
 
   workspace.onDidChangeTextDocument(changeEvent => {
@@ -54,6 +118,13 @@ export function activate(context: ExtensionContext): void {
 
   workspace.onDidOpenTextDocument(document => {
     reviewDocument(document);
+  });
+
+  workspace.onDidCloseTextDocument(document => {
+    inProgress.delete(document);
+    maxSizeWarningFiles.delete(document);
+    savedRanges.delete(document);
+    savedSelections.delete(document);
   });
 
   selectionModeOverride = readConfiguration().selectionMode;
@@ -95,8 +166,9 @@ export function activate(context: ExtensionContext): void {
       reviewDocument(currentDocument);
   }
 
-  function reviewDocument(document: TextDocument, attempt = 1): void {
-    if (attempt > 5)
+  function reviewDocument(document: TextDocument, attempt = 1, first = 0, last = document.lineCount - 1,
+      breaks?: Range[], debugBreaks?: Range[], highlights?: Range[]): void {
+    if (attempt > MAX_PARSE_RETRY_ATTEMPTS)
       return;
 
     const editors = getEditors(document);
@@ -107,21 +179,50 @@ export function activate(context: ExtensionContext): void {
     currentDocument = document;
 
     if (!scopeInfoApi.getScopeAt(document, new Position(0, 0))) {
-      setTimeout(() => reviewDocument(document, ++attempt), 250);
+      setTimeout(() => reviewDocument(document, ++attempt, first, last, breaks, debugBreaks, highlights),
+        WAIT_FOR_PARSE_RETRY_TIME);
       return;
     }
 
-    editors.forEach(editor => lookForLigatures(document, editor, 0, document.lineCount - 1));
+    editors.forEach(editor => lookForLigatures(document, editor, first, last, breaks, debugBreaks, highlights));
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
-      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = []): void {
+      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = [], pass = 0): void {
     if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
       return;
+    else if (pass === 0 && inProgress.has(document)) {
+      if (first > 0 || last < document.lineCount - 1) {
+        const currentRange = inProgress.get(document);
+        inProgress.set(document, { first: Math.min(first, currentRange.first), last: Math.max(last, currentRange.last) });
+        return;
+      }
+      else {
+        inProgress.delete(document);
+        breaks.length = 0;
+        debugBreaks.length = 0;
+        highlights.length = 0;
+      }
+    }
 
+    const doSort = pass === 0 && (breaks.length > 0 || debugBreaks.length > 0 || highlights.length > 0);
     const background: Range[] = [];
+    const fileSize = document.offsetAt(new Position(document.lineCount, 0));
 
-    if (ligatureSuppression) {
+    if ((maxLines > 0 && document.lineCount > maxLines) || (maxFileSize > 0 && fileSize > maxFileSize)) {
+      if (globalMaxSizeWarningEnabled && !maxSizeWarningFiles.has(document)) {
+        const option1 = "Don't warn again for this document.";
+        const option2 = "Don't warn again this session.";
+        window.showWarningMessage('Because of file size, all ligatures in this document will be displayed.',
+          option1, option2).then(selection => {
+          if (selection === option1)
+            maxSizeWarningFiles.add(document);
+          else if (selection === option2)
+            globalMaxSizeWarningEnabled = false;
+        });
+      }
+    }
+    else if (ligatureSuppression) {
       const started = processMillis();
       const docLanguage = document.languageId;
       const docLangConfig = readConfiguration(docLanguage);
@@ -198,7 +299,7 @@ export function activate(context: ExtensionContext): void {
             for (let j = 0; j < editor.selections.length && !selected; ++j) {
               const selection = editor.selections[j];
 
-              selected = !!selection.intersection(range);
+              selected = (selectionMode === 'line' ? selection.active.line === i : !!selection.intersection(range));
             }
           }
 
@@ -210,8 +311,14 @@ export function activate(context: ExtensionContext): void {
             highlights.push(new Range(i, index, i, index + ligature.length));
         }
 
-        if (processMillis() > started + 50_000_000) {
-          setTimeout(() => lookForLigatures(document, editor, i + 1, last, breaks, debugBreaks, highlights), 50);
+        if (processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
+          inProgress.set(document, { first: i + 1, last });
+          setTimeout(() => {
+            const currentRange = inProgress.get(document);
+
+            if (currentRange)
+              lookForLigatures(document, editor, currentRange.first, currentRange.last, breaks, debugBreaks, highlights, pass + 1);
+          }, PROCESS_YIELD_TIME);
           return;
         }
       }
@@ -219,25 +326,30 @@ export function activate(context: ExtensionContext): void {
     else
       background.push(new Range(0, 0, last + 1, 0));
 
+    if (doSort) {
+      const sort = (a: Range, b: Range) => a.start.line === b.start.line ? a.start.character - b.start.character : a.start.line - b.start.line;
+
+      breaks.sort(sort);
+      debugBreaks.sort(sort);
+      highlights.sort(sort);
+    }
+
     editor.setDecorations(breakNormal, breaks);
     editor.setDecorations(breakDebug, debugBreaks);
     editor.setDecorations(highlightLigature, highlights);
     editor.setDecorations(allLigatures, background);
+    inProgress.delete(document);
+    savedRanges.set(document, { breaks, debugBreaks, highlights, background });
   }
 }
 
 function getTokenLanguage(docLanguage: string, scope: string): string {
-  const suffix = (/\.([^.]+)$/.exec(scope) ?? [])[1];
+  const id = (/^.+\.(.+)$/.exec(scope) ?? [])[1];
 
-  if (!suffix || !/^(html|markdown|xhtml|xml)$/.test(docLanguage))
+  if (!id || !/^(html|markdown|xhtml|xml)$/.test(docLanguage))
     return docLanguage;
 
-  switch (suffix) {
-    case 'js': return 'javascript';
-    case 'css': return 'css';
-  }
-
-  return docLanguage;
+  return getLanguageIdFromScope(scope) ?? docLanguage;
 }
 
 function findContextConfig(config: InternalConfig, scope: string, category: string): ContextConfig {
