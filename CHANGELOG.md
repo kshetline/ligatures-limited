@@ -1,7 +1,7 @@
 ## 1.2.0
 
 * Fix problem of unresponsive behavior with large files.
-* There is now configurable maximum document size (default 2,000,000 characters) and maximum line count (default 50,000 lines) for handling ligatures, above which _Ligatures Limited_ will leave a document as is.
+* There is now configurable maximum document size (default 35M characters) and maximum line count (default 20K lines) for handling ligatures, above which _Ligatures Limited_ will leave a document as is for speedier editing and highlighting. These values can be set to 0 to ignore size or line count.
 
 ## 1.1.0
 

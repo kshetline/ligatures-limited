@@ -35,6 +35,15 @@ let maxFileSize = DEFAULT_MAX_FILE_SIZE;
 const maxSizeWarningFiles = new Set<TextDocument>();
 let globalMaxSizeWarningEnabled = true;
 
+const inProgress = new Map<TextDocument, { first: number, last: number }>();
+const savedSelections = new Map<TextDocument, Selection[]>();
+const savedRanges = new Map<TextDocument, {
+  breaks: Range[],
+  debugBreaks: Range[],
+  highlights: Range[],
+  background: Range[]
+}>();
+
 export function activate(context: ExtensionContext): void {
   const scopeInfoApi = scopeInfoActivate(context);
 
@@ -60,8 +69,46 @@ export function activate(context: ExtensionContext): void {
   });
 
   window.onDidChangeTextEditorSelection(event => {
-    if (window.visibleTextEditors.includes(event.textEditor))
-      reviewDocument(event.textEditor.document);
+    if (window.visibleTextEditors.includes(event.textEditor)) {
+      const doc = event.textEditor.document;
+      const ranges = savedRanges.get(doc);
+      const lastSelections = savedSelections.get(doc);
+
+      savedSelections.set(doc, Array.from(event.selections));
+
+      if (ranges && ranges.background.length === 0) {
+        let first = doc.lineCount;
+        let last = -1;
+        const findSelectionBounds = (s: Selection) => {
+          first = Math.min(s.anchor.line, s.active.line, first);
+          last = Math.max(s.anchor.line, s.active.line, last);
+        };
+        const clearOldRanges = (r: Range[]) => {
+          for (let i = 0; i < r.length; ++i) {
+            const line = r[i].start.line;
+
+            if (first <= line && line <= last)
+              r.splice(i--, 1);
+          }
+        };
+
+        event.selections.forEach(findSelectionBounds);
+
+        if (lastSelections)
+          lastSelections.forEach(findSelectionBounds);
+
+        clearOldRanges(ranges.breaks);
+        clearOldRanges(ranges.debugBreaks);
+        clearOldRanges(ranges.highlights);
+        reviewDocument(doc, 0, first, last, ranges.breaks, ranges.debugBreaks, ranges.highlights);
+      }
+      else {
+        savedSelections.delete(doc);
+        reviewDocument(doc);
+      }
+    }
+    else if (event.textEditor.document)
+      savedSelections.delete(event.textEditor.document);
   });
 
   workspace.onDidChangeTextDocument(changeEvent => {
@@ -74,7 +121,10 @@ export function activate(context: ExtensionContext): void {
   });
 
   workspace.onDidCloseTextDocument(document => {
+    inProgress.delete(document);
     maxSizeWarningFiles.delete(document);
+    savedRanges.delete(document);
+    savedSelections.delete(document);
   });
 
   selectionModeOverride = readConfiguration().selectionMode;
@@ -116,7 +166,8 @@ export function activate(context: ExtensionContext): void {
       reviewDocument(currentDocument);
   }
 
-  function reviewDocument(document: TextDocument, attempt = 1, first = 0, last = document.lineCount - 1): void {
+  function reviewDocument(document: TextDocument, attempt = 1, first = 0, last = document.lineCount - 1,
+      breaks?: Range[], debugBreaks?: Range[], highlights?: Range[]): void {
     if (attempt > MAX_PARSE_RETRY_ATTEMPTS)
       return;
 
@@ -128,21 +179,37 @@ export function activate(context: ExtensionContext): void {
     currentDocument = document;
 
     if (!scopeInfoApi.getScopeAt(document, new Position(0, 0))) {
-      setTimeout(() => reviewDocument(document, ++attempt, first, last), WAIT_FOR_PARSE_RETRY_TIME);
+      setTimeout(() => reviewDocument(document, ++attempt, first, last, breaks, debugBreaks, highlights),
+        WAIT_FOR_PARSE_RETRY_TIME);
       return;
     }
 
-    editors.forEach(editor => lookForLigatures(document, editor, first, last));
+    editors.forEach(editor => lookForLigatures(document, editor, first, last, breaks, debugBreaks, highlights));
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
-      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = []): void {
+      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = [], count = 0): void {
     if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
       return;
+    else if (count === 0 && inProgress.has(document)) {
+      if (first > 0 || last < document.lineCount - 1) {
+        const currentRange = inProgress.get(document);
+        inProgress.set(document, { first: Math.min(first, currentRange.first), last: Math.max(last, currentRange.last) });
+        return;
+      }
+      else {
+        inProgress.delete(document);
+        breaks.length = 0;
+        debugBreaks.length = 0;
+        highlights.length = 0;
+      }
+    }
 
+    const doSort = count === 0 && (breaks.length > 0 || debugBreaks.length > 0 || highlights.length > 0);
     const background: Range[] = [];
+    const fileSize = document.offsetAt(new Position(document.lineCount, 0));
 
-    if (document.lineCount > maxLines || document.getText().length > maxFileSize) {
+    if ((maxLines > 0 && document.lineCount > maxLines) || (maxFileSize > 0 && fileSize > maxFileSize)) {
       if (globalMaxSizeWarningEnabled && !maxSizeWarningFiles.has(document)) {
         const option1 = "Don't warn again for this document.";
         const option2 = "Don't warn again this session.";
@@ -232,7 +299,7 @@ export function activate(context: ExtensionContext): void {
             for (let j = 0; j < editor.selections.length && !selected; ++j) {
               const selection = editor.selections[j];
 
-              selected = !!selection.intersection(range);
+              selected = (selectionMode === 'line' ? selection.active.line === i : !!selection.intersection(range));
             }
           }
 
@@ -245,7 +312,13 @@ export function activate(context: ExtensionContext): void {
         }
 
         if (processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
-          setTimeout(() => lookForLigatures(document, editor, i + 1, last, breaks, debugBreaks, highlights), PROCESS_YIELD_TIME);
+          inProgress.set(document, { first: i + 1, last });
+          setTimeout(() => {
+            const currentRange = inProgress.get(document);
+
+            if (currentRange)
+              lookForLigatures(document, editor, currentRange.first, currentRange.last, breaks, debugBreaks, highlights, count + 1);
+          }, PROCESS_YIELD_TIME);
           return;
         }
       }
@@ -253,10 +326,20 @@ export function activate(context: ExtensionContext): void {
     else
       background.push(new Range(0, 0, last + 1, 0));
 
+    if (doSort) {
+      const sort = (a: Range, b: Range) => a.start.line === b.start.line ? a.start.character - b.start.character : a.start.line - b.start.line;
+
+      breaks.sort(sort);
+      debugBreaks.sort(sort);
+      highlights.sort(sort);
+    }
+
     editor.setDecorations(breakNormal, breaks);
     editor.setDecorations(breakDebug, debugBreaks);
     editor.setDecorations(highlightLigature, highlights);
     editor.setDecorations(allLigatures, background);
+    inProgress.delete(document);
+    savedRanges.set(document, { breaks, debugBreaks, highlights, background });
   }
 }
 

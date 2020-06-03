@@ -166,13 +166,14 @@ async function provideHoverInfo(subscriptions: Disposable[]): Promise<void> {
 }
 
 function getScopeAt(document: TextDocument, position: Position): Token {
-  if (document.languageId === 'plaintext')
+  if (document.languageId === 'plaintext') {
     return {
       category: 'text',
       range: new Range(0, 0, document.lineCount, document.lineAt(document.lineCount - 1)?.text?.length ?? 0),
       scopes: [],
-      text: document.getText()
+      text: document.lineAt(position.line).text
     };
+  }
 
   try {
     const prettyDoc = documents.get(document.uri);

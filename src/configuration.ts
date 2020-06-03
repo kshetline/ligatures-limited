@@ -3,8 +3,8 @@ import { workspace } from 'vscode';
 import { showErrorMessage } from './extension-util';
 
 export type SelectionMode = 'cursor' | 'line' | 'off' | 'selection';
-export const DEFAULT_MAX_LINES = 50_000;
-export const DEFAULT_MAX_FILE_SIZE = 2_000_000;
+export const DEFAULT_MAX_LINES = 20_000;
+export const DEFAULT_MAX_FILE_SIZE = 35_000_000;
 
 interface LLConfiguration {
   compactScopeDisplay?: boolean;

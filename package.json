@@ -140,13 +140,13 @@
 				},
 				"ligaturesLimited.maxFileSize": {
 					"type": "number",
-					"default": 2000000,
+					"default": 35000000,
 					"description": "Maximum character count for files (larger files are ignored).",
 					"title": "Maximum character count"
 				},
 				"ligaturesLimited.maxLines": {
 					"type": "number",
-					"default": 50000,
+					"default": 20000,
 					"description": "Maximum line count for files (larger files are ignored).",
 					"title": "Maximum line count"
 				},
