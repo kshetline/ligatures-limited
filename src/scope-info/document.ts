@@ -173,6 +173,7 @@ export class DocumentController implements Disposable {
   private applyChanges(changes: readonly TextDocumentContentChangeEvent[]): void {
     const sortedChanges =
       changes.slice(0).sort((change1, change2) => change1.range.start.isAfter(change2.range.start) ? -1 : 1);
+
     for (const change of sortedChanges) {
       try {
         const delta = textUtil.toRangeDelta(change.range, change.text);

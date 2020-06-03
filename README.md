@@ -136,6 +136,10 @@ The two fonts I typically use (Fira Code and my own home-brew version of Menlo) 
 
 (Please note that *Ligatures Limited* can’t force ligatures to be rendered that aren’t provided by your selected font in the first place.)
 
+### File size limits
+
+To prevent Visual Studio Code from getting bogged down when handling very large files (way too large to be normal, proper source code files), there are default limits on the size of files which will be handled: no more than 20K lines, and no more than 35M characters. These limits can be modified using `"ligaturesLimited.maxLines"` and `"ligaturesLimited.maxFileSize"`. If you set these values to zero, size checking is disabled.
+
 ### Sample configuration
 
 ```json

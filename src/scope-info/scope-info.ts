@@ -171,7 +171,7 @@ function getScopeAt(document: TextDocument, position: Position): Token {
       category: 'text',
       range: new Range(0, 0, document.lineCount, document.lineAt(document.lineCount - 1)?.text?.length ?? 0),
       scopes: [],
-      text: document.lineAt(position.line).text
+      text: document.getText(new Range(0, 0, Math.min(document.lineCount, 10), 0))
     };
   }
 

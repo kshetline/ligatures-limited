@@ -61,7 +61,7 @@ export function rangeDeltaNewRange(delta: RangeDelta): Range {
   else
     x = delta.end.character + delta.endCharactersDelta;
 
-  return new Range(delta.start, new Position(delta.end.line + delta.linesDelta, x));
+  return new Range(delta.start, new Position(delta.end.line + delta.linesDelta, Math.max(x, 0)));
 }
 
 function positionRangeDeltaTranslate(pos: Position, delta: RangeDelta): Position {
@@ -75,7 +75,7 @@ function positionRangeDeltaTranslate(pos: Position, delta: RangeDelta): Position
     else if (delta.start.line === delta.end.line + delta.linesDelta && delta.linesDelta < 0)
       x = x + delta.start.character;
 
-    return new Position(pos.line + delta.linesDelta, x);
+    return new Position(pos.line + delta.linesDelta, Math.max(x, 0));
   }
   else
     return new Position(pos.line + delta.linesDelta, pos.character);
@@ -92,7 +92,7 @@ function positionRangeDeltaTranslateEnd(pos: Position, delta: RangeDelta): Posit
     else if (delta.start.line === delta.end.line + delta.linesDelta && delta.linesDelta < 0)
       x = x + delta.start.character;
 
-    return new Position(pos.line + delta.linesDelta, x);
+    return new Position(pos.line + delta.linesDelta, Math.max(x, 0));
   }
   else
     return new Position(pos.line + delta.linesDelta, pos.character);
