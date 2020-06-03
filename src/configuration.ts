@@ -165,7 +165,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     let prefix = '';
 
     if (languageConfig == null) {
-      languageConfig = workspace.getConfiguration().get(`[${language}]`);
+      languageConfig = workspace.getConfiguration(null, null).get(`[${language}]`);
       prefix = 'ligaturesLimited.';
     }
 

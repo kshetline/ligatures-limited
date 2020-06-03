@@ -188,10 +188,10 @@ export function activate(context: ExtensionContext): void {
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
-      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = [], count = 0): void {
+      breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = [], pass = 0): void {
     if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
       return;
-    else if (count === 0 && inProgress.has(document)) {
+    else if (pass === 0 && inProgress.has(document)) {
       if (first > 0 || last < document.lineCount - 1) {
         const currentRange = inProgress.get(document);
         inProgress.set(document, { first: Math.min(first, currentRange.first), last: Math.max(last, currentRange.last) });
@@ -205,7 +205,7 @@ export function activate(context: ExtensionContext): void {
       }
     }
 
-    const doSort = count === 0 && (breaks.length > 0 || debugBreaks.length > 0 || highlights.length > 0);
+    const doSort = pass === 0 && (breaks.length > 0 || debugBreaks.length > 0 || highlights.length > 0);
     const background: Range[] = [];
     const fileSize = document.offsetAt(new Position(document.lineCount, 0));
 
@@ -317,7 +317,7 @@ export function activate(context: ExtensionContext): void {
             const currentRange = inProgress.get(document);
 
             if (currentRange)
-              lookForLigatures(document, editor, currentRange.first, currentRange.last, breaks, debugBreaks, highlights, count + 1);
+              lookForLigatures(document, editor, currentRange.first, currentRange.last, breaks, debugBreaks, highlights, pass + 1);
           }, PROCESS_YIELD_TIME);
           return;
         }
