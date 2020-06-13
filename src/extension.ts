@@ -33,6 +33,7 @@ let ligatureSuppression = true;
 let maxLines = DEFAULT_MAX_LINES;
 let maxFileSize = DEFAULT_MAX_FILE_SIZE;
 const maxSizeWarningFiles = new Set<TextDocument>();
+let globalLigatureWarningEnabled = true;
 let globalMaxSizeWarningEnabled = true;
 
 const inProgress = new Map<TextDocument, { first: number, last: number }>();
@@ -97,10 +98,12 @@ export function activate(context: ExtensionContext): void {
         if (lastSelections)
           lastSelections.forEach(findSelectionBounds);
 
-        clearOldRanges(ranges.breaks);
-        clearOldRanges(ranges.debugBreaks);
-        clearOldRanges(ranges.highlights);
-        reviewDocument(doc, 0, first, last, ranges.breaks, ranges.debugBreaks, ranges.highlights);
+        if (first < doc.lineCount && first <= last) {
+          clearOldRanges(ranges.breaks);
+          clearOldRanges(ranges.debugBreaks);
+          clearOldRanges(ranges.highlights);
+          reviewDocument(doc, 0, first, last, ranges.breaks, ranges.debugBreaks, ranges.highlights);
+        }
       }
       else {
         savedSelections.delete(doc);
@@ -131,6 +134,16 @@ export function activate(context: ExtensionContext): void {
   init();
 
   function init(): void {
+    if (!workspace.getConfiguration().get('editor.fontLigatures') && globalLigatureWarningEnabled) {
+      const option1 = 'OK';
+      const option2 = "Don't warn again this session.";
+      window.showWarningMessage('Ligature fonts are not enabled',
+        option1, option2).then(selection => {
+        if (selection === option2)
+          globalLigatureWarningEnabled = false;
+      });
+    }
+
     workspace.textDocuments.forEach(document => reviewDocument(document));
   }
 
@@ -205,6 +218,15 @@ export function activate(context: ExtensionContext): void {
       }
     }
 
+    const docLanguage = document.languageId;
+    const docLangConfig = readConfiguration(docLanguage);
+
+    if (typeof docLangConfig === 'object' && docLangConfig.deactivated) {
+      editor.setDecorations(allLigatures, []); // This is only needed to signal unit tests that this method has completed.
+
+      return;
+    }
+
     const doSort = pass === 0 && (breaks.length > 0 || debugBreaks.length > 0 || highlights.length > 0);
     const background: Range[] = [];
     const fileSize = document.offsetAt(new Position(document.lineCount, 0));
@@ -224,8 +246,6 @@ export function activate(context: ExtensionContext): void {
     }
     else if (ligatureSuppression) {
       const started = processMillis();
-      const docLanguage = document.languageId;
-      const docLangConfig = readConfiguration(docLanguage);
       let lastTokenLanguage: string;
       let lastTokenConfig: InternalConfig | boolean;
       const matcher = getLigatureMatcher();
@@ -233,6 +253,8 @@ export function activate(context: ExtensionContext): void {
       for (let i = first; i <= last; ++i) {
         const line = document.lineAt(i).text;
         let match: RegExpExecArray;
+        let lastHighlight: Range;
+        let lastHighlightCategory: string;
 
         while ((match = matcher.exec(line))) {
           const index = match.index;
@@ -307,8 +329,31 @@ export function activate(context: ExtensionContext): void {
             for (let j = 0; j < ligature.length; ++j)
               (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
           }
-          else if (debug)
-            highlights.push(new Range(i, index, i, index + ligature.length));
+          else if (debug) {
+            let highlight = new Range(i, index, i, index + ligature.length);
+
+            if (lastHighlight && lastHighlight.end.character === highlight.start.character && lastHighlightCategory === category) {
+              highlights.pop();
+              highlight = new Range(lastHighlight.start, highlight.end);
+            }
+
+            highlights.push(highlight);
+            lastHighlight = highlight;
+            lastHighlightCategory = category;
+          }
+        }
+
+        if (lastHighlight) {
+          const extendCandidate = line.substr(lastHighlight.end.character - 1, 2);
+
+          if (extendCandidate.length === 2 && matcher.test(extendCandidate)) {
+            const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, lastHighlight.end.character + 1))?.category;
+
+            if (candidateCategory === lastHighlightCategory) {
+              highlights.pop();
+              highlights.push(new Range(lastHighlight.start, new Position(lastHighlight.end.line, lastHighlight.end.character + 1)));
+            }
+          }
         }
 
         if (processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {

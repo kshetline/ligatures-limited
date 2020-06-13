@@ -169,7 +169,7 @@ function getScopeAt(document: TextDocument, position: Position): Token {
   if (document.languageId === 'plaintext') {
     return {
       category: 'text',
-      range: new Range(0, 0, document.lineCount, document.lineAt(document.lineCount - 1)?.text?.length ?? 0),
+      range: new Range(0, 0, document.lineCount, document.lineAt(Math.max(document.lineCount - 1, 0))?.text?.length ?? 0),
       scopes: [],
       text: document.getText(new Range(0, 0, Math.min(document.lineCount, 10), 0))
     };

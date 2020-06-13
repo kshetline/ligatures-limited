@@ -1,4 +1,20 @@
 {
+  // "editor.fontFamily": "Iosevka, 'Fira Code', Menlo, Monaco, 'Courier New', monospace",
+  "editor.fontLigatures": "'ss07'",
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": "string.unquoted.cdata.xml",
+        "settings": {
+          "foreground": "#D4D4D4"
+        }
+      }
+    ]
+  },
+  "[c]": {
+    "editor.fontFamily": "Menlo, Monaco, 'Courier New', monospace",
+    "editor.fontLigatures": false
+  },
   "ligaturesLimited.languages": {
     "css, javascript": {
       "ligaturesByContext": {

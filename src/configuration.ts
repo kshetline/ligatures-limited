@@ -32,6 +32,7 @@ export interface ContextConfig {
 export interface InternalConfig {
   compactScopeDisplay: boolean;
   contexts: Set<string>;
+  deactivated: boolean;
   debug: boolean;
   ligatures: Set<string>;
   ligaturesByContext: Record<string, ContextConfig>;
@@ -44,6 +45,7 @@ export interface InternalConfig {
 const FALLBACK_CONFIG: InternalConfig = {
   compactScopeDisplay: false,
   contexts: new Set<string>(),
+  deactivated: false,
   debug: false,
   ligatures: new Set<string>(),
   ligaturesByContext: {},
@@ -55,17 +57,19 @@ const FALLBACK_CONFIG: InternalConfig = {
 
 const baseLigatures = String.raw`
 
-  .= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==>
+  .= ..= .- := =:= == != === !== =/= <-< <<- <-- <- <-> -> --> ->> >-> <=< <<= <== <=> => ==> =!= =:=
   =>> >=> >>= >>- >- <~> -< -<< =<< <~~ <~ ~~ ~> ~~> <<< << <= <> >= >> >>> {. {| [| <: :> |] |} .}
   <||| <|| <| <|> |> ||> |||> <$ <$> $> <+ <+> +> <* <*> *> \\ \\\ \* /* */ /// // <// <!-- </> --> />
-  ;; :: ::: .. ... ..< !! ?? %% && || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl
-  -~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #_( 9x9 0xF 0o7 0b1
-  <==== ==== ====> <====> <--- ---> <---> <~~~ ~~~> <~~~>
+  ;; :: ::: .. ... ..< !! ?? %% && <:< || ?. ?: ++ +++ -- --- ** *** ~= ~- www ff fi fl ffi ffl
+  -~ ~@ ^= ?= /= /== |= ||= #! ## ### #### #{ #[ ]# #( #? #_ #: #= #_( #{} =~ !~ 9x9 0xF 0o7 0b1
+  |- |-- -| --| |== =| ==| /==/ ==/ /=/ <~~> =>= =<= :>: :<: /\ \/ _|_ ||- :< >: ::=
+  <==== ==== ====> <====> <--- ---> <---> |--- ---| |=== ===| /=== ===/ <~~~ ~~~> <~~~>
 
 `.trim().split(/\s+/);
 
 /* eslint-disable quote-props */
 const patternSubstitutions: any = {
+  '####': '#{4,}',
   '<====': '<={4,}',
   '====': '={4,}',
   '====>': '={4,}>',
@@ -73,19 +77,27 @@ const patternSubstitutions: any = {
   '<---': '<-{3,}',
   '--->': '-{3,}>',
   '<--->': '<-{3,}>',
+  '|---': '\\|-{3,}',
+  '---|': '-{3,}\\|',
+  '|===': '\\|={3,}',
+  '===|': '={3,}\\|',
+  '/===': '\\/={3,}',
+  '===/': '={3,}\\/',
   '<~~~': '<~{3,}',
   '~~~>': '~{3,}>',
   '<~~~>': '<~{3,}>',
   '0xF': '0x[0-9a-fA-F]',
   '0o7': '0o[0-7]',
   '0b1': '0b[01]',
-  '9x9': '\\dx\\d',
-  'www': '\\bwww\\b'
+  '9x9': '\\dx\\d'
 };
 /* eslint-enable quote-props */
 
 let disregarded: string[] = [];
 const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '0o7', '0b1', '9x9']);
+const baseLanguages = {
+  markdown: true
+};
 const baseLigatureContexts = new Set<string>(['operator', 'comment_marker', 'punctuation', 'number']);
 const baseLigaturesByContext = {
   number: {
@@ -143,6 +155,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
 
   let userConfig: LLConfiguration | boolean;
   let template: InternalConfig | boolean;
+  let deactivated = false;
 
   if (language) {
     if (configurationsByLanguage.has(language))
@@ -154,6 +167,10 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     // Getting language-specific settings for your own extension is a bit of a hack, sorry to say!
     const languages = workspace.getConfiguration().get('ligaturesLimited.languages');
     const languageMap = new Map<string, string>();
+    const vsLanguageConfig = workspace.getConfiguration(null, null).get(`[${language}]`);
+
+    deactivated = !((vsLanguageConfig ?? {})['editor.fontLigatures'] ??
+      workspace.getConfiguration().get('editor.fontLigatures'));
 
     if (languages) {
       Object.keys(languages).forEach(key =>
@@ -164,37 +181,43 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     let languageConfig = languages && languages[languageMap.get(language) ?? ''];
     let prefix = '';
 
-    if (languageConfig == null) {
-      languageConfig = workspace.getConfiguration(null, null).get(`[${language}]`);
+    if (languageConfig == null && vsLanguageConfig) {
+      languageConfig = vsLanguageConfig;
       prefix = 'ligaturesLimited.';
     }
 
     if (typeof languageConfig === 'boolean')
       userConfig = languageConfig;
     else if (languageConfig) {
-      const config = languageConfig.ligaturesLimited ?? {};
+      const config = languageConfig.ligaturesLimited ?? baseLanguages[language] ?? {};
 
-      config.compactScopeDisplay = languageConfig[`${prefix}compactScopeDisplay`] ?? config.compactScopeDisplay;
-      config.contexts = languageConfig[`${prefix}contexts`] ?? config.contexts;
-      config.debug = languageConfig[`${prefix}debug`] ?? config.debug;
-      config.inherit = languageConfig[`${prefix}inherit`] ?? config.inherit;
-      config.ligatures = languageConfig[`${prefix}ligatures`] ?? config.ligatures;
-      config.ligaturesByContext = languageConfig[`${prefix}ligaturesByContext`] ?? config.ligaturesByContext;
-      config.selectionMode = languageConfig[`${prefix}selectionMode`] ?? config.selectionMode;
+      if (typeof config === 'boolean')
+        userConfig = config;
+      else {
+        config.compactScopeDisplay = languageConfig[`${prefix}compactScopeDisplay`] ?? config.compactScopeDisplay;
+        config.contexts = languageConfig[`${prefix}contexts`] ?? config.contexts;
+        config.debug = languageConfig[`${prefix}debug`] ?? config.debug;
+        config.inherit = languageConfig[`${prefix}inherit`] ?? config.inherit;
+        config.ligatures = languageConfig[`${prefix}ligatures`] ?? config.ligatures;
+        config.ligaturesByContext = languageConfig[`${prefix}ligaturesByContext`] ?? config.ligaturesByContext;
+        config.selectionMode = languageConfig[`${prefix}selectionMode`] ?? config.selectionMode;
 
-      Object.keys(config).forEach(key => {
-        const value = config[key];
+        Object.keys(config).forEach(key => {
+          const value = config[key];
 
-        if (value) {
-          if (!userConfig)
-            userConfig = {} as any;
+          if (value) {
+            if (!userConfig)
+              userConfig = {} as any;
 
-          userConfig[key] = value;
-        }
-      });
+            userConfig[key] = value;
+          }
+        });
+      }
     }
+    else
+      userConfig = baseLanguages[language];
 
-    if (userConfig && !(typeof userConfig === 'boolean')) {
+    if (userConfig && typeof userConfig !== 'boolean') {
       template = defaultConfiguration;
 
       if (userConfig.inherit) {
@@ -212,7 +235,9 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
   if (userConfig == null) {
     userConfig = workspace.getConfiguration().get('ligaturesLimited');
 
-    if (!(typeof userConfig === 'boolean') && userConfig?.inherit && !language)
+    if (typeof userConfig === 'boolean')
+      throw new Error('true/false values are not valid for the root ligaturesLimited configuration.');
+    else if (userConfig?.inherit && !language)
       throw new Error('"inherit" is not a valid property for the root ligaturesLimited configuration.');
   }
 
@@ -225,6 +250,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     template = {
       compactScopeDisplay: false,
       contexts: baseLigatureContexts,
+      deactivated,
       debug: false,
       ligatures: new Set(baseDisabledLigatures),
       ligaturesByContext: baseLigaturesByContext,
@@ -238,6 +264,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
   const internalConfig = {
     compactScopeDisplay: !!(userConfig?.compactScopeDisplay ?? template.compactScopeDisplay),
     contexts: new Set(template.contexts),
+    deactivated,
     debug: userConfig?.debug ?? template.debug,
     ligatures: new Set(template.ligatures),
     ligaturesByContext: clone(template.ligaturesByContext),
@@ -325,6 +352,26 @@ function generatePattern(ligature: string): string {
       ++index;
     }
   }
+
+  // Handle ligatures which are supposed to be connective with other ligatures
+
+  if (ligature.startsWith('-') && /^[-<>|]+$/.test(ligature))
+    leadingSet.delete('-');
+
+  if (ligature.startsWith('=') && /^[=<>|]+$/.test(ligature))
+    leadingSet.delete('=');
+
+  if (ligature.startsWith('~') && /^[~<>|]+$/.test(ligature))
+    leadingSet.delete('~');
+
+  if (ligature.endsWith('-') && /^[-<>|]+$/.test(ligature))
+    trailingSet.delete('-');
+
+  if (ligature.endsWith('=') && /^[=<>|]+$/.test(ligature))
+    trailingSet.delete('=');
+
+  if (ligature.endsWith('~') && /^[~<>|]+$/.test(ligature))
+    trailingSet.delete('~');
 
   const leading = createLeadingOrTrailingClass(leadingSet);
   const trailing = createLeadingOrTrailingClass(trailingSet);

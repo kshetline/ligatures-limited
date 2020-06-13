@@ -1,3 +1,10 @@
+## 1.3.0
+
+* The default for Markdown is now to display all ligatures, unless _Ligatures Limited_ is configured otherwise.
+* Added support for new Fira Code line/box drawing ligatures, as well as other previously missing ligatures.
+* Clean up some errors being thrown which were harmless to the functioning of the extension, but nevertheless annoying.
+* Added "Known Issues" section to documentation to list problems caused by interactions between _Ligatures Limited_ and some other extensions.
+
 ## 1.2.0
 
 * Fixed problem with unresponsive behavior when editing large files.

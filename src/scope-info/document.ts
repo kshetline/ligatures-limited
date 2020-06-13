@@ -162,8 +162,8 @@ export class DocumentController implements Disposable {
 
     // Collect new pretties
     const lineCount = this.document.lineCount;
-    let lineIdx;
-    for (lineIdx = range.start.line; lineIdx <= range.end.line || (invalidatedTokenState && lineIdx < lineCount); ++lineIdx) {
+
+    for (let lineIdx = range.start.line; lineIdx <= range.end.line || (invalidatedTokenState && lineIdx < lineCount); ++lineIdx) {
       const line = this.document.lineAt(lineIdx);
       const { invalidated } = this.refreshTokensOnLine(line);
       invalidatedTokenState = invalidated;
