@@ -317,7 +317,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
 
   allLigatures.sort((a, b) => b.length - a.length); // Sort from longest to shortest
   globalMatchLigatures = new RegExp(allLigatures.map(lig =>
-    patternSubstitutions[lig] ?? generatePattern(lig)
+    patternSubstitutions[lig] ?? generatePattern(lig, allLigatures)
   ).join('|'), 'g');
 
   if (!language)
@@ -331,12 +331,19 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
 // The major purpose of this function is escaping ligature characters so that they
 // can be used in a regex, but for some ligatures it's also important to make sure
 // certain characters don't precede or follow a ligature to establish a valid match.
-function generatePattern(ligature: string): string {
+function generatePattern(ligature: string, allLigatures: string[]): string {
   const leadingSet = new Set<string>();
   const trailingSet = new Set<string>();
   const len = ligature.length;
 
-  for (const other of disregarded) {
+  // Give triangles (◁, ▷) and diamonds (♢) formed using < and > higher priority.
+  if (/^[>|]/.test(ligature))
+    leadingSet.add('<');
+
+  if (/[|<]$/.test(ligature))
+    trailingSet.add('>');
+
+  for (const other of allLigatures) {
     if (other.length <= len)
       break;
 
@@ -353,25 +360,20 @@ function generatePattern(ligature: string): string {
     }
   }
 
-  // Handle ligatures which are supposed to be connective with other ligatures
+  // Handle ligatures which are supposed to blend with combinatory arrow ligatures
+  const connectionTweaks = {
+    '-': /^[-<>|]+$/,
+    '=': /^[=<>|]+$/,
+    '~': /^[~<>|]+$/
+  };
 
-  if (ligature.startsWith('-') && /^[-<>|]+$/.test(ligature))
-    leadingSet.delete('-');
+  Object.keys(connectionTweaks).forEach(key => {
+    if (ligature.startsWith(key) && connectionTweaks[key].test(ligature))
+      leadingSet.delete(key);
 
-  if (ligature.startsWith('=') && /^[=<>|]+$/.test(ligature))
-    leadingSet.delete('=');
-
-  if (ligature.startsWith('~') && /^[~<>|]+$/.test(ligature))
-    leadingSet.delete('~');
-
-  if (ligature.endsWith('-') && /^[-<>|]+$/.test(ligature))
-    trailingSet.delete('-');
-
-  if (ligature.endsWith('=') && /^[=<>|]+$/.test(ligature))
-    trailingSet.delete('=');
-
-  if (ligature.endsWith('~') && /^[~<>|]+$/.test(ligature))
-    trailingSet.delete('~');
+    if (ligature.endsWith(key) && connectionTweaks[key].test(ligature))
+      trailingSet.delete(key);
+  });
 
   const leading = createLeadingOrTrailingClass(leadingSet);
   const trailing = createLeadingOrTrailingClass(trailingSet);

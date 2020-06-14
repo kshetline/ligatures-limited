@@ -25,6 +25,7 @@ const WAIT_FOR_PARSE_RETRY_TIME = 250;
 const MAX_PARSE_RETRY_ATTEMPTS = 5;
 
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
+const SLASH3 = String.raw`\\\ `.trim();
 let globalDebug: boolean = null;
 let selectionModeOverride: SelectionMode = null;
 const selectionModes: SelectionMode[] = [null, 'off', 'cursor', 'line', 'selection'];
@@ -256,6 +257,26 @@ export function activate(context: ExtensionContext): void {
         let lastHighlight: Range;
         let lastHighlightCategory: string;
 
+        const checkHighlightExtension = (): void => {
+          if (lastHighlight) {
+            const saveIndex = matcher.lastIndex;
+            const extendCandidate = line.substr(lastHighlight.end.character - 2, 3);
+
+            matcher.lastIndex = 1;
+
+            if (extendCandidate.length === 3 && matcher.test(extendCandidate)) {
+              const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, lastHighlight.end.character + 1))?.category;
+
+              if (candidateCategory === lastHighlightCategory) {
+                highlights.pop();
+                highlights.push(new Range(lastHighlight.start, new Position(lastHighlight.end.line, lastHighlight.end.character + 1)));
+              }
+            }
+
+            matcher.lastIndex = saveIndex;
+          }
+        };
+
         while ((match = matcher.exec(line))) {
           const index = match.index;
           let ligature = match[0];
@@ -289,7 +310,7 @@ export function activate(context: ExtensionContext): void {
 
             // Did the matched ligature overshoot a token boundary?
             if (ligature.length > scope.text.length &&
-                !bleedThroughs.has(ligature) && !(category === 'string' && ligature === '\\\\\\')) {
+                !bleedThroughs.has(ligature) && !(category === 'string' && ligature === SLASH3)) {
               shortened = true;
               matcher.lastIndex -= ligature.length - scope.text.length;
               ligature = ligature.substr(0, scope.text.length);
@@ -328,6 +349,8 @@ export function activate(context: ExtensionContext): void {
           if (suppress || selected) {
             for (let j = 0; j < ligature.length; ++j)
               (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
+
+            checkHighlightExtension();
           }
           else if (debug) {
             let highlight = new Range(i, index, i, index + ligature.length);
@@ -336,6 +359,8 @@ export function activate(context: ExtensionContext): void {
               highlights.pop();
               highlight = new Range(lastHighlight.start, highlight.end);
             }
+            else
+              checkHighlightExtension();
 
             highlights.push(highlight);
             lastHighlight = highlight;
@@ -343,18 +368,7 @@ export function activate(context: ExtensionContext): void {
           }
         }
 
-        if (lastHighlight) {
-          const extendCandidate = line.substr(lastHighlight.end.character - 1, 2);
-
-          if (extendCandidate.length === 2 && matcher.test(extendCandidate)) {
-            const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, lastHighlight.end.character + 1))?.category;
-
-            if (candidateCategory === lastHighlightCategory) {
-              highlights.pop();
-              highlights.push(new Range(lastHighlight.start, new Position(lastHighlight.end.line, lastHighlight.end.character + 1)));
-            }
-          }
-        }
+        checkHighlightExtension();
 
         if (processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
           inProgress.set(document, { first: i + 1, last });

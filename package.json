@@ -24,9 +24,6 @@
 	},
 	"main": "./dist/extension",
 	"contributes": {
-		"configurationDefaults": {
-			"editor.fontLigatures": true
-		},
 		"configuration": {
 			"title": "Ligatures Limited",
 			"properties": {

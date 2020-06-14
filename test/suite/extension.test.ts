@@ -162,12 +162,13 @@ suite('Extension Tests', () => {
     expect(isCorrectlyDecorated(decorations, 13, 27, 3, highlightLigature), 'ts =>').to.not.be.ok;
   });
 
-  it('should find extended mixed ligatures', async function () {
+  it('should find extended mixed ligatures and prioritize the |> part of =|>', async function () {
     this.slow(1000);
     this.timeout(2000);
     const decorations = await getDecorations('sample.md');
     expect(decorations).to.be.ok;
     expect(isCorrectlyDecorated(decorations, 3, 67, 11, highlightLigature), 'md >>--|--||->').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 3, 80, 2, highlightLigature), 'md |>').to.be.ok;
   });
 
   it('should find no ligatures in C document with ligatures disabled by VSCode', async function () {

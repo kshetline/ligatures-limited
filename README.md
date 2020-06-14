@@ -38,6 +38,8 @@ Fira Code again, but with all ligatures suppressed<br>
 
 The bottom row are indefinite-width ligatures. When specifying these ligatures, three equals signs (`=`), dashes (`-`), or tildes (`~`) represent three *or more* of those signs, except for the first three ligatures, where four equals signs represent four or more.
 
+`####` is another indefinite-width ligature, representing four or more number signs (`#`) in a row.
+
 ## Commands
 
 * cycleLigatureDebug
