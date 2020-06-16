@@ -94,6 +94,7 @@ const patternSubstitutions: any = {
 /* eslint-enable quote-props */
 
 let disregarded: string[] = [];
+const defaultDisregarded = ['ff', 'fi', 'fl', 'ffi', 'ffl'];
 const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '0o7', '0b1', '9x9']);
 const baseLanguages = {
   markdown: true
@@ -227,7 +228,9 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     }
   }
   else {
-    disregarded = toStringArray(workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures'));
+    const foo = workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures');
+    console.log(foo);
+    disregarded = toStringArray(workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures') || defaultDisregarded);
     globalLigatures = new Set(baseLigatures);
     disregarded.forEach(l => globalLigatures.delete(l));
   }

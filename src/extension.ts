@@ -10,7 +10,7 @@ import {
 } from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
-import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
+import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, onChangeDocument, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
 
 export const breakNormal = window.createTextEditorDecorationType({ color: '' });
@@ -38,7 +38,7 @@ let globalLigatureWarningEnabled = true;
 let globalMaxSizeWarningEnabled = true;
 
 const inProgress = new Map<TextDocument, { first: number, last: number }>();
-const savedSelections = new Map<TextDocument, Selection[]>();
+const savedSelections = new Map<TextEditor, Selection[]>();
 const savedRanges = new Map<TextDocument, {
   breaks: Range[],
   debugBreaks: Range[],
@@ -71,53 +71,74 @@ export function activate(context: ExtensionContext): void {
   });
 
   window.onDidChangeTextEditorSelection(event => {
-    if (window.visibleTextEditors.includes(event.textEditor)) {
-      const doc = event.textEditor.document;
-      const ranges = savedRanges.get(doc);
-      const lastSelections = savedSelections.get(doc);
+    if (!window.visibleTextEditors.includes(event.textEditor)) {
+      savedSelections.delete(event.textEditor);
+      return;
+    }
 
-      savedSelections.set(doc, Array.from(event.selections));
+    const editor = event.textEditor;
+    const doc = editor.document;
+    const ranges = savedRanges.get(doc);
+    const lastSelections = savedSelections.get(editor);
 
-      if (ranges && ranges.background.length === 0) {
-        let first = doc.lineCount;
-        let last = -1;
-        const findSelectionBounds = (s: Selection) => {
-          first = Math.min(s.anchor.line, s.active.line, first);
-          last = Math.max(s.anchor.line, s.active.line, last);
-        };
-        const clearOldRanges = (r: Range[]) => {
-          for (let i = 0; i < r.length; ++i) {
-            const line = r[i].start.line;
+    savedSelections.set(editor, Array.from(event.selections));
 
-            if (first <= line && line <= last)
-              r.splice(i--, 1);
-          }
-        };
+    if (ranges && ranges.background.length === 0) {
+      let first = doc.lineCount;
+      let last = -1;
+      const findSelectionBounds = (s: Selection) => {
+        first = Math.min(s.anchor.line, s.active.line, first);
+        last = Math.max(s.anchor.line, s.active.line, last);
+      };
+      const clearOldRanges = (r: Range[]) => {
+        for (let i = 0; i < r.length; ++i) {
+          const line = r[i].start.line;
 
-        event.selections.forEach(findSelectionBounds);
-
-        if (lastSelections)
-          lastSelections.forEach(findSelectionBounds);
-
-        if (first < doc.lineCount && first <= last) {
-          clearOldRanges(ranges.breaks);
-          clearOldRanges(ranges.debugBreaks);
-          clearOldRanges(ranges.highlights);
-          reviewDocument(doc, 0, first, last, ranges.breaks, ranges.debugBreaks, ranges.highlights);
+          if (first <= line && line <= last)
+            r.splice(i--, 1);
         }
-      }
-      else {
-        savedSelections.delete(doc);
-        reviewDocument(doc);
+      };
+
+      event.selections.forEach(findSelectionBounds);
+
+      if (lastSelections)
+        lastSelections.forEach(findSelectionBounds);
+
+      first = Math.min(first, doc.lineCount - 1);
+
+      if (first <= last) {
+        clearOldRanges(ranges.breaks);
+        clearOldRanges(ranges.debugBreaks);
+        clearOldRanges(ranges.highlights);
+        reviewDocument(doc, 0, first, last, ranges.breaks, ranges.debugBreaks, ranges.highlights);
       }
     }
-    else if (event.textEditor.document)
-      savedSelections.delete(event.textEditor.document);
+    else {
+      savedSelections.delete(editor);
+      reviewDocument(doc);
+    }
   });
 
   workspace.onDidChangeTextDocument(changeEvent => {
-    if (changeEvent.contentChanges.length > 0)
-      reviewDocument(changeEvent.document);
+    if (changeEvent.contentChanges.length > 0) {
+      onChangeDocument(changeEvent);
+
+      const doc = changeEvent.document;
+      let first = doc.lineCount;
+      let last = -1;
+      let linesChanged = 0;
+
+      changeEvent.contentChanges.forEach(change => {
+        first = Math.min(first, change.range.start.line);
+        last = Math.max(last, change.range.end.line);
+        linesChanged += change.range.end.line - change.range.start.line + 1;
+      });
+
+      last = Math.min(last + linesChanged, doc.lineCount - 1);
+
+      if (first <= last)
+        reviewDocument(doc, 0, first, last);
+    }
   });
 
   workspace.onDidOpenTextDocument(document => {
@@ -128,7 +149,11 @@ export function activate(context: ExtensionContext): void {
     inProgress.delete(document);
     maxSizeWarningFiles.delete(document);
     savedRanges.delete(document);
-    savedSelections.delete(document);
+
+    const editors = getEditors(document);
+
+    if (editors)
+      editors.forEach(editor => savedSelections.delete(editor));
   });
 
   selectionModeOverride = readConfiguration().selectionMode;
@@ -182,7 +207,7 @@ export function activate(context: ExtensionContext): void {
 
   function reviewDocument(document: TextDocument, attempt = 1, first = 0, last = document.lineCount - 1,
       breaks?: Range[], debugBreaks?: Range[], highlights?: Range[]): void {
-    if (attempt > MAX_PARSE_RETRY_ATTEMPTS)
+    if (attempt > MAX_PARSE_RETRY_ATTEMPTS || first < 0)
       return;
 
     const editors = getEditors(document);
@@ -198,7 +223,10 @@ export function activate(context: ExtensionContext): void {
       return;
     }
 
-    editors.forEach(editor => lookForLigatures(document, editor, first, last, breaks, debugBreaks, highlights));
+    editors.forEach(editor => {
+      savedSelections.set(editor, editor.selections);
+      lookForLigatures(document, editor, first, last, breaks, debugBreaks, highlights);
+    });
   }
 
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
@@ -246,6 +274,8 @@ export function activate(context: ExtensionContext): void {
       }
     }
     else if (ligatureSuppression) {
+      last = Math.min(last, document.lineCount - 1);
+
       const started = processMillis();
       let lastTokenLanguage: string;
       let lastTokenConfig: InternalConfig | boolean;
@@ -397,8 +427,8 @@ export function activate(context: ExtensionContext): void {
     editor.setDecorations(breakDebug, debugBreaks);
     editor.setDecorations(highlightLigature, highlights);
     editor.setDecorations(allLigatures, background);
-    inProgress.delete(document);
     savedRanges.set(document, { breaks, debugBreaks, highlights, background });
+    inProgress.delete(document);
   }
 }
 

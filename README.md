@@ -175,7 +175,9 @@ Markdown has all ligatures enabled, and plain text and various forms of JSON hav
 
 ## Known Issues
 
-A user has reported that _Ligatures Limited_ does not play well with the extensions [Overtype](https://marketplace.visualstudio.com/items?itemName=adammaras.overtype) and [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one) when editing large files.
+* A user has reported that _Ligatures Limited_ does not play well with the extensions [Overtype](https://marketplace.visualstudio.com/items?itemName=adammaras.overtype) and [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one) when editing large files.
+
+* Occasionally, when working with large files, a console warning `UNRESPONSIVE extension host` may appear, but despite the wording of the message VSCode remains responsive anyway.
 
 ## Credits
 
