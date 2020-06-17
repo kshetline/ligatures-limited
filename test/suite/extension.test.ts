@@ -9,14 +9,17 @@ chai.use(spies);
 
 type DecorationMap = Map<string, Range[]>;
 
-function findEditor(name: string): TextEditor {
-  const editors = Array.from(window.visibleTextEditors);
+async function findEditor(name: string): Promise<TextEditor> {
+  for (let i = 0; i < 5; ++i) {
+    await new Promise(resolve => setTimeout(() => resolve(), 50));
+    const editors = Array.from(window.visibleTextEditors);
 
-  for (const editor of editors) {
-    const fileName = editor.document.fileName.replace(/^.*[/\\]/, '');
+    for (const editor of editors) {
+      const fileName = editor.document.fileName.replace(/(^.*[/\\])|(\.git$)/g, '');
 
-    if (fileName === name)
-      return editor;
+      if (fileName === name)
+        return editor;
+    }
   }
 
   return undefined;
@@ -58,7 +61,7 @@ function isCorrectlyDecorated(map: DecorationMap, line: number, column: number, 
 async function getDecorations(fileName: string, clearOnAny = false): Promise<DecorationMap> {
   const docFile = Uri.file(path.join(__dirname, `../../../test/suite/sample-project/${fileName}`));
   await commands.executeCommand('vscode.open', docFile);
-  const editor = findEditor(fileName);
+  const editor = await findEditor(fileName);
   const decorations = new Map<string, Range[]>();
   let gotDecorations: (map: DecorationMap) => void;
 

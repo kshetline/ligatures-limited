@@ -11,7 +11,7 @@ import {
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, onChangeDocument, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
-import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
+import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor, TextEditorSelectionChangeEvent } from 'vscode';
 
 export const breakNormal = window.createTextEditorDecorationType({ color: '' });
 export const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
@@ -19,10 +19,12 @@ export const highlightLigature = window.createTextEditorDecorationType({ color: 
 export const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
 export const ligatureDecorations = [breakNormal, breakDebug, highlightLigature, allLigatures];
 
+const OPEN_DOCUMENT_DELAY = 100;
 const MAX_TIME_FOR_PROCESSING_LINES = 100;
 const PROCESS_YIELD_TIME = 50;
 const WAIT_FOR_PARSE_RETRY_TIME = 250;
 const MAX_PARSE_RETRY_ATTEMPTS = 5;
+const RANGE_DELAY = 2000;
 
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
 const SLASH3 = String.raw`\\\ `.trim();
@@ -37,7 +39,11 @@ const maxSizeWarningFiles = new Set<TextDocument>();
 let globalLigatureWarningEnabled = true;
 let globalMaxSizeWarningEnabled = true;
 
-const inProgress = new Map<TextEditor, { first: number, last: number }>();
+const openTimes = new Map<TextDocument, number>();
+const openDocumentTimers = new Map<TextDocument, any>();
+const selectionTimers = new Map<TextEditor, any>();
+const visibleRanges = new Map<TextEditor, { range: Range, time: number }>();
+const inProgress = new Map<TextEditor, { first: number, last: number, timer: any }>();
 const savedSelections = new Map<TextEditor, Selection[]>();
 const savedRanges = new Map<TextEditor, {
   breaks: Range[],
@@ -66,17 +72,54 @@ export function activate(context: ExtensionContext): void {
   }, null, context.subscriptions);
 
   window.onDidChangeVisibleTextEditors(() => {
-    for (const editor of window.visibleTextEditors)
+    const editors = window.visibleTextEditors;
+
+    selectionTimers.forEach((timer, editor) => {
+      if (!editors.includes(editor)) {
+        clearTimeout(timer);
+        selectionTimers.delete(editor);
+      }
+    });
+
+    inProgress.forEach((progress, editor) => {
+      if (!editors.includes(editor)) {
+        if (progress.timer)
+          clearTimeout(progress.timer);
+
+        inProgress.delete(editor);
+      }
+    });
+
+    Array.from(visibleRanges.keys()).forEach(editor => {
+      if (!editors.includes(editor))
+        visibleRanges.delete(editor);
+    });
+
+    for (const editor of editors)
       reviewDocument(editor.document);
   });
 
   window.onDidChangeTextEditorSelection(event => {
-    if (!window.visibleTextEditors.includes(event.textEditor)) {
-      savedSelections.delete(event.textEditor);
-      return;
-    }
-
     const editor = event.textEditor;
+    const doc = editor.document;
+
+    if (!window.visibleTextEditors.includes(editor))
+      savedSelections.delete(editor);
+    else if (openDocumentTimers.has(doc) && getEditors(doc)) {
+      if (selectionTimers.has(editor))
+        clearTimeout(selectionTimers.get(editor));
+
+      selectionTimers.set(editor, setTimeout(() => selectionChange(event), OPEN_DOCUMENT_DELAY));
+    }
+    else if (!getEditors(doc)) {
+      const editors = getEditors(doc, true);
+
+      if (editors)
+        selectionChange(event, editors[0]);
+    }
+  });
+
+  function selectionChange(event: TextEditorSelectionChangeEvent, editor = event.textEditor): void {
     const doc = editor.document;
     const lastSelections = savedSelections.get(editor);
 
@@ -121,10 +164,13 @@ export function activate(context: ExtensionContext): void {
 
     if (last >= 0 && first <= last)
       reviewDocument(doc, 1, first, last, firstSkip, lastSkip);
-  });
+  }
 
   window.onDidChangeTextEditorVisibleRanges(event => {
-    console.log('vis range:', event.textEditor.document.fileName, JSON.stringify(event.visibleRanges));
+    const range = (event.visibleRanges ?? [])[0];
+
+    if (range)
+      visibleRanges.set(event.textEditor, { range, time: processMillis() });
   });
 
   workspace.onDidChangeTextDocument(changeEvent => {
@@ -150,16 +196,30 @@ export function activate(context: ExtensionContext): void {
   });
 
   workspace.onDidOpenTextDocument(document => {
-    reviewDocument(document);
+    if (openDocumentTimers.has(document))
+      clearTimeout(openDocumentTimers.get(document));
+
+    openTimes.set(document, processMillis());
+    openDocumentTimers.set(document, setTimeout(() => reviewDocument(document), OPEN_DOCUMENT_DELAY));
   });
 
   workspace.onDidCloseTextDocument(document => {
+    if (openDocumentTimers.has(document))
+      clearTimeout(openDocumentTimers.get(document));
+
+    openDocumentTimers.delete(document);
+    openTimes.delete(document);
     maxSizeWarningFiles.delete(document);
 
     const editors = getEditors(document);
 
     if (editors)
       editors.forEach(editor => {
+        if (selectionTimers.has(editor))
+          clearTimeout(selectionTimers.get(editor));
+
+        selectionTimers.delete(editor);
+        visibleRanges.delete(editor);
         savedRanges.delete(editor);
         inProgress.delete(editor);
         savedSelections.delete(editor);
@@ -261,21 +321,43 @@ export function activate(context: ExtensionContext): void {
     });
   }
 
+  function clearRanges(r: Range[], first: number, last: number): void {
+    for (let i = 0; i < r.length; ++i) {
+      const line = r[i].start.line;
+
+      if (first <= line && line <= last)
+        r.splice(i--, 1);
+    }
+  };
+
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
       firstSkip?: number, lastSkip?: number,
       breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = [], pass = 0): void {
-    console.log('lookForLigatures:', document.fileName, pass, first, last);
-    if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
+    if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor)) {
+      inProgress.delete(editor);
+
       return;
+    }
 
     if (pass === 0 && inProgress.has(editor)) {
+      const currentRange = inProgress.get(editor);
+
       if (first > 0 || last < document.lineCount - 1) {
-        const currentRange = inProgress.get(editor);
-        inProgress.set(editor, { first: Math.min(first, currentRange.first), last: Math.max(last, currentRange.last) });
+        first = Math.min(first, currentRange.first);
+        last = Math.max(last, currentRange.last);
+        clearRanges(breaks, first, last);
+        clearRanges(debugBreaks, first, last);
+        clearRanges(highlights, first, last);
+        inProgress.set(editor, { first, last, timer: currentRange.timer });
+
         return;
       }
       else {
+        if (currentRange.timer)
+          clearTimeout(currentRange.timer);
+
         inProgress.delete(editor);
+        firstSkip = lastSkip = undefined;
         breaks.length = 0;
         debugBreaks.length = 0;
         highlights.length = 0;
@@ -319,7 +401,6 @@ export function activate(context: ExtensionContext): void {
       let firstInView = document.lineCount;
       let lastInView = -1;
       const processLines = (first0: number, last0: number, checkTime = true): boolean => {
-        console.log('processLines:', first0, last0, checkTime);
         let lastTokenLanguage: string;
         let lastTokenConfig: InternalConfig | boolean;
 
@@ -334,7 +415,7 @@ export function activate(context: ExtensionContext): void {
           let lastHighlight: Range;
           let lastHighlightCategory: string;
 
-          const checkHighlightExtension = (): void => {
+          const checkToExtendHighlight = (): void => {
             if (lastHighlight) {
               const saveIndex = matcher.lastIndex;
               const extendCandidate = line.substr(lastHighlight.end.character - 2, 3);
@@ -427,7 +508,7 @@ export function activate(context: ExtensionContext): void {
               for (let j = 0; j < ligature.length; ++j)
                 (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
 
-              checkHighlightExtension();
+              checkToExtendHighlight();
             }
             else if (debug) {
               let highlight = new Range(i, index, i, index + ligature.length);
@@ -437,7 +518,7 @@ export function activate(context: ExtensionContext): void {
                 highlight = new Range(lastHighlight.start, highlight.end);
               }
               else
-                checkHighlightExtension();
+                checkToExtendHighlight();
 
               highlights.push(highlight);
               lastHighlight = highlight;
@@ -445,18 +526,20 @@ export function activate(context: ExtensionContext): void {
             }
           }
 
-          checkHighlightExtension();
+          checkToExtendHighlight();
 
           if (checkTime && processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
-            console.log('time:', processMillis() - started, i + 1, last);
-            inProgress.set(editor, { first: i + 1, last });
-            setTimeout(() => {
-              const currentRange = inProgress.get(editor);
+            inProgress.set(editor, {
+              first: i + 1,
+              last,
+              timer: setTimeout(() => {
+                const currentRange = inProgress.get(editor);
 
-              if (currentRange)
-                lookForLigatures(document, editor, currentRange.first, currentRange.last, undefined, undefined,
-                  breaks, debugBreaks, highlights, pass + 1);
-            }, PROCESS_YIELD_TIME);
+                if (currentRange)
+                  lookForLigatures(document, editor, currentRange.first, currentRange.last, undefined, undefined,
+                    breaks, debugBreaks, highlights, pass + 1);
+              }, PROCESS_YIELD_TIME)
+            });
 
             return true;
           }
@@ -467,10 +550,16 @@ export function activate(context: ExtensionContext): void {
 
       // Take care of what's currently visible on screen first.
       if (pass === 0 && editor.visibleRanges?.length === 1) {
-        const range = editor.visibleRanges[0];
+        let range = editor.visibleRanges[0];
+        // Oddly enough, a visible range reported by a recent onDidChangeTextEditorVisibleRanges event
+        // will be more accurate than the visible range info inside the editor object itself.
+        const lastRange = visibleRanges.get(editor);
+
+        if (lastRange && processMillis() < lastRange.time + RANGE_DELAY)
+          range = lastRange.range;
+
         const viewFirst = Math.max(first, Math.min(range.start.line - 1, range.end.line - 1));
         const viewLast = Math.min(last, Math.max(range.start.line + 1, range.end.line + 1));
-        console.log('viewFirst, viewLast:', viewFirst, viewLast);
 
         processLines(viewFirst, viewLast, false);
         editor.setDecorations(breakNormal, breaks);
@@ -546,12 +635,13 @@ function isValidDocument(document: TextDocument): boolean {
     document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output');
 }
 
-function getEditors(document: TextDocument): TextEditor[] {
-  const editors: TextEditor[] = [];
+function getEditors(document: TextDocument, tryHarder = false): TextEditor[] {
+  let editors: TextEditor[] = window.visibleTextEditors.filter(editor => editor.document === document);
 
-  for (const editor of window.visibleTextEditors) {
-    if (editor.document === document)
-      editors.push(editor);
+  if (editors.length === 0 && tryHarder && document.fileName.endsWith('.git')) {
+    const name = document.fileName.substr(0, document.fileName.length - 4);
+
+    editors = window.visibleTextEditors.filter(editor => editor.document.fileName === name);
   }
 
   return editors.length > 0 ? editors : undefined;
