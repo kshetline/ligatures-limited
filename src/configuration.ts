@@ -228,9 +228,8 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     }
   }
   else {
-    const foo = workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures');
-    console.log(foo);
-    disregarded = toStringArray(workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures') || defaultDisregarded);
+    disregarded = toStringArray(workspace.getConfiguration().get('ligaturesLimited.disregardedLigatures'));
+    defaultDisregarded.filter(lig => !disregarded.includes(lig)).forEach(lig => disregarded.push(lig));
     globalLigatures = new Set(baseLigatures);
     disregarded.forEach(l => globalLigatures.delete(l));
   }

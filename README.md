@@ -14,11 +14,13 @@ In the top image, you can see ligatures that don’t make sense where they are �
 
 The image below shows how those out-of-place ligatures are suppressed by *Ligatures Limited*, replaced with individual characters, while the triple-equals and double-ampersand ligatures are retained.
 
-With the default settings for this extension ligatures are only rendered in three contexts: _operators_, _punctuation_, and _comment markers_, plus three special cases: <img src="https://shetline.com/readme/ligatures-limited/v1.3.0/0x_nolig.png" width="16" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="0x ligature"> when followed by a hexadecimal digit in a numeric context, rendered as `0×` (if supported by your chosen font), and a similar pattern, `0o7` for octal numbers, and `0b1` for binary numbers.
+With the default settings for this extension ligatures are only rendered in three contexts: _operators_, _punctuation_, and _comment markers_, plus three special cases: <img src="https://shetline.com/readme/ligatures-limited/v1.3.0/0x_nolig.png" width="16" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="0x ligature"> when followed by a hexadecimal digit in a numeric context, rendered as `0×` (if supported by your chosen font), and a similar pattern, `0o7` for octal numbers, and `0b1` for binary numbers as well.
 
-Also by default, ligatures for `www`, `ff`, `fi`, `fl`, `ffi`, `ffl` are suppressed in all contexts, as well as the special case of `x` between any two decimal digits, which, unless suppressed, may render as (for example) `2×4`. If you want to see any of these ligatures rendered (provided, of course, that your chosen font defines them), you must expressly enable them.
+Also by default, the special case of `x` between any two decimal digits is suppressed, which would render as (for example) `2×4`. If you want to see these ligatures rendered in any or all contexts, (provided, of course, that your chosen font defines them), you must expressly enable them.
 
 Ligatures can also be suppressed (with individual characters shown instead) at the current insert cursor position (this is the default setting), for all of the current line being edited, or within all of the current text selection. This feature can be turned off entirely as well, so that the cursor position or text selection have no effect.
+
+The ligatures `ff`, `fi`, `fl`, `ffi`, and `ffl` are by default rendered in all contexts. You can change your configuration suppress these ligatures, which you may wish to do when using a font which, for instance, renders `fi` within the width of a single character, instead of as two characters (see [Disregarded Ligatures](#disregarded-ligatures)).
 
 While the default settings should meet many users’ needs, custom settings are available to control which syntactical contexts are handled, and which particular ligatures are displayed or suppressed. Settings can be global or on a per-language basis (say, different rules for JavaScript than for Python, if you wish).
 
@@ -120,15 +122,13 @@ A leading `X` enables all ligatures, after which you can list just the ligatures
 
 ### Disregarded ligatures
 
-The `disregardedLigatures` setting, available only at the global level, is a space-separated string of ligatures for *Ligatures Limited* to entirely ignore. If your font wants to render these ligatures, it will render them.
+The `disregardedLigatures` setting, available only at the global level, is a space-separated string of ligatures for *Ligatures Limited* to entirely ignore. If your font wants to render these ligatures, it will render them regardless of context.
 
-For example, *Ligatures Limited* suppresses these ligatures by default: `www ff fi fl ffi ffl`
+*Ligatures Limited* disregards these ligatures by default: `ff fi fl ffi ffl`
 
-The two fonts I typically use (Fira Code and my own home-brew version of Menlo) don’t have the `ff fi fl ffi ffl` ligatures anyway. By adding this setting:
+Ligatures you specify for `disregardedLigatures` will be added to this default list.
 
-`"ligaturesLimited.disregardedLigatures": "ff fi fl ffi ffl"`
-
-...no extra effort is wasted by *Ligatures Limited* to suppress ligatures that aren’t there to suppress in the first place.
+If you need to *un*disregard (for lack of a better word) any of these by-default disregarded ligatures, simply using them in any ligature list will bring them back into consideration for all ligature processing.
 
 (Please note that *Ligatures Limited* can’t force ligatures to be rendered that aren’t provided by your selected font in the first place.)
 
@@ -175,10 +175,8 @@ Markdown has all ligatures enabled, and plain text and various forms of JSON hav
 
 ## Known Issues
 
-* A user has reported that _Ligatures Limited_ does not play well with the extensions [Overtype](https://marketplace.visualstudio.com/items?itemName=adammaras.overtype) and [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one) when editing large files.
-
 * Occasionally, when working with large files, a console warning `UNRESPONSIVE extension host` may appear, but despite the wording of the message VSCode remains responsive anyway.
 
 ## Credits
 
-This extension is a spin-off of two other projects, [vscode-Disable-Ligatures](https://github.com/CoenraadS/vscode-Disable-Ligatures) by CoenraadS, and [scope-info](https://github.com/siegebell/scope-info), by C. J. Bell.
+This extension is partially a spin-off of two other projects, [vscode-Disable-Ligatures](https://github.com/CoenraadS/vscode-Disable-Ligatures) by CoenraadS, and [scope-info](https://github.com/siegebell/scope-info), by C. J. Bell.

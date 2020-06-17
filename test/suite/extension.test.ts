@@ -109,6 +109,7 @@ suite('Extension Tests', () => {
 
     expect(isCorrectlyDecorated(decorations, 13, 8, 3, breakNormal), 'js www in lc').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 13, 12, 2, breakNormal), 'js == in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 13, 15, 2, breakNormal), 'js fi in lc').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 14, 8, 3, null), 'js www in bc').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 14, 12, 2, breakNormal), 'js => in bc').to.be.ok;
