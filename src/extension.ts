@@ -259,7 +259,6 @@ export function activate(context: ExtensionContext): void {
 
   function cycleSelectionMode(): void {
     selectionModeOverride = selectionModes[(Math.max(selectionModes.indexOf(selectionModeOverride), 0) + 1) % selectionModes.length];
-
     showInfoMessage('Ligature selection disable mode: ' + (selectionModeOverride ?? 'by settings'));
 
     if (currentDocument)

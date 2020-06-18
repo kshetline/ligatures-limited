@@ -38,7 +38,7 @@ Fira Code again, but with all ligatures suppressed<br>
 
 <img src="https://shetline.com/readme/ligatures-limited/v1.3.0/0xF_nolig.png" width="24" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="0xF ligature"> represents `0x` followed by any hexadecimal digit, and <img src="https://shetline.com/readme/ligatures-limited/v1.3.0/9x9_nolig.png" width="24" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="9x9 ligature"> represents `x` surrounded by any decimal digits. You can specify your own additional ligatures if you need *Ligatures Limited* to be aware of them.
 
-The bottom row are indefinite-width ligatures. When specifying these ligatures, three equals signs (`=`), dashes (`-`), or tildes (`~`) represent three *or more* of those signs, except for the first three ligatures, where four equals signs represent four or more.
+The bottom row are indefinite-width ligatures. When specifying these ligatures, _three_ equals signs (`=`), dashes (`-`), or tildes (`~`) represent three *or more* of those signs, except for the first three ligatures, where _four_ equals signs represent four or more.
 
 `####` is another indefinite-width ligature, representing four or more number signs (`#`) in a row.
 
@@ -124,9 +124,9 @@ A leading `X` enables all ligatures, after which you can list just the ligatures
 
 The `disregardedLigatures` setting, available only at the global level, is a space-separated string of ligatures for *Ligatures Limited* to entirely ignore. If your font wants to render these ligatures, it will render them regardless of context.
 
-*Ligatures Limited* disregards these ligatures by default: `ff fi fl ffi ffl`
+*Ligatures Limited* disregards the following ligatures by default: `ff fi fl ffi ffl`
 
-Ligatures you specify for `disregardedLigatures` will be added to this default list.
+Ligatures you specify for `disregardedLigatures` will be added to the above default list.
 
 If you need to *un*disregard (for lack of a better word) any of these by-default disregarded ligatures, simply using them in any ligature list will bring them back into consideration for all ligature processing.
 
