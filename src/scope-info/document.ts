@@ -1,8 +1,7 @@
 import { last } from 'ks-util';
 import * as textUtil from './text-util';
 import {
-  Disposable, Position, Range, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent,
-  TextLine, window, workspace
+  Position, Range, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent, TextLine, window
 } from 'vscode';
 import { IGrammar, IToken, StackElement } from 'vscode-textmate';
 
@@ -19,24 +18,13 @@ export interface ScopeInfoAPI {
   getScopeForLanguage(language: string): string;
 }
 
-export class DocumentController implements Disposable {
-  private subscriptions: Disposable[] = [];
-  // Stores the state for each line
+export class DocumentController {
   private grammarState: StackElement[] = [];
 
-  public constructor(private document: TextDocument, private grammar: IGrammar) {
+  public constructor(public document: TextDocument, private grammar: IGrammar) {
     // Parse whole document
     const docRange = new Range(0, 0, this.document.lineCount, 0);
     this.reparsePretties(docRange);
-
-    this.subscriptions.push(workspace.onDidChangeTextDocument(event => {
-      if (event.document === this.document)
-        this.onChangeDocument(event);
-    }));
-  }
-
-  public dispose(): void {
-    this.subscriptions.forEach(sub => sub.dispose());
   }
 
   public hasEditor(): boolean {
@@ -162,8 +150,8 @@ export class DocumentController implements Disposable {
 
     // Collect new pretties
     const lineCount = this.document.lineCount;
-    let lineIdx;
-    for (lineIdx = range.start.line; lineIdx <= range.end.line || (invalidatedTokenState && lineIdx < lineCount); ++lineIdx) {
+
+    for (let lineIdx = range.start.line; lineIdx <= range.end.line || (invalidatedTokenState && lineIdx < lineCount); ++lineIdx) {
       const line = this.document.lineAt(lineIdx);
       const { invalidated } = this.refreshTokensOnLine(line);
       invalidatedTokenState = invalidated;
@@ -182,12 +170,16 @@ export class DocumentController implements Disposable {
         this.reparsePretties(editRange);
       }
       catch (e) {
-        console.error(e);
+        // Errors thrown here appear to be harmless. I'd like to be more specific, but I can't reproduce
+        // the errors messages which have been reported, and this code is not originally mine. It would
+        // appear that the out-of-range values which produce invalid Range(s) and Position(s) are outside
+        // of the range of real code changes which need to be tracked.
+        // console.error(e);
       }
     }
   }
 
-  private onChangeDocument(event: TextDocumentChangeEvent): void {
+  public onChangeDocument(event: TextDocumentChangeEvent): void {
     this.applyChanges(event.contentChanges);
   }
 

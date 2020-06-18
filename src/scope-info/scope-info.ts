@@ -10,7 +10,7 @@ import fs from 'fs';
 import * as oniguruma from 'vscode-oniguruma-wasm';
 import { join } from 'path';
 import {
-  Disposable, ExtensionContext, Extension, extensions, Hover, languages, Position, Range, TextDocument, Uri, workspace
+  Disposable, ExtensionContext, Extension, extensions, Hover, languages, Position, Range, TextDocument, TextDocumentChangeEvent, Uri, workspace
 } from 'vscode';
 import { IGrammar, IRawGrammar, parseRawGrammar, Registry, RegistryOptions } from 'vscode-textmate';
 
@@ -58,6 +58,10 @@ function getLanguages(): ExtensionGrammar[] {
   catch {}
 
   return [];
+}
+
+export function onChangeDocument(event: TextDocumentChangeEvent): void {
+  documents.forEach(key => { if (key.document === event.document) key.onChangeDocument(event); });
 }
 
 export function getLanguageIdFromScope(scope: string): string {
@@ -169,7 +173,7 @@ function getScopeAt(document: TextDocument, position: Position): Token {
   if (document.languageId === 'plaintext') {
     return {
       category: 'text',
-      range: new Range(0, 0, document.lineCount, document.lineAt(document.lineCount - 1)?.text?.length ?? 0),
+      range: new Range(0, 0, document.lineCount, document.lineAt(Math.max(document.lineCount - 1, 0))?.text?.length ?? 0),
       scopes: [],
       text: document.getText(new Range(0, 0, Math.min(document.lineCount, 10), 0))
     };
@@ -288,16 +292,11 @@ async function openDocument(doc: TextDocument): Promise<void> {
 function closeDocument(doc: TextDocument): void {
   const prettyDoc = documents.get(doc.uri);
 
-  if (prettyDoc) {
-    prettyDoc.dispose();
+  if (prettyDoc)
     documents.delete(doc.uri);
-  }
 }
 
 function unloadDocuments(): void {
-  for (const prettyDoc of documents.values())
-    prettyDoc.dispose();
-
   documents.clear();
 }
 

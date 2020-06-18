@@ -10,8 +10,8 @@ import {
 } from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
-import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
-import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor } from 'vscode';
+import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, onChangeDocument, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
+import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor, TextEditorSelectionChangeEvent } from 'vscode';
 
 export const breakNormal = window.createTextEditorDecorationType({ color: '' });
 export const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
@@ -19,12 +19,15 @@ export const highlightLigature = window.createTextEditorDecorationType({ color: 
 export const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
 export const ligatureDecorations = [breakNormal, breakDebug, highlightLigature, allLigatures];
 
+const OPEN_DOCUMENT_DELAY = 100;
 const MAX_TIME_FOR_PROCESSING_LINES = 100;
 const PROCESS_YIELD_TIME = 50;
 const WAIT_FOR_PARSE_RETRY_TIME = 250;
 const MAX_PARSE_RETRY_ATTEMPTS = 5;
+const RANGE_DELAY = 2000;
 
 const bleedThroughs = new Set(['?:', '+=', '-=', '*=', '/=', '^=']);
+const SLASH3 = String.raw`\\\ `.trim();
 let globalDebug: boolean = null;
 let selectionModeOverride: SelectionMode = null;
 const selectionModes: SelectionMode[] = [null, 'off', 'cursor', 'line', 'selection'];
@@ -33,11 +36,16 @@ let ligatureSuppression = true;
 let maxLines = DEFAULT_MAX_LINES;
 let maxFileSize = DEFAULT_MAX_FILE_SIZE;
 const maxSizeWarningFiles = new Set<TextDocument>();
+let globalLigatureWarningEnabled = true;
 let globalMaxSizeWarningEnabled = true;
 
-const inProgress = new Map<TextDocument, { first: number, last: number }>();
-const savedSelections = new Map<TextDocument, Selection[]>();
-const savedRanges = new Map<TextDocument, {
+const openTimes = new Map<TextDocument, number>();
+const openDocumentTimers = new Map<TextDocument, any>();
+const selectionTimers = new Map<TextEditor, any>();
+const visibleRanges = new Map<TextEditor, { range: Range, time: number }>();
+const inProgress = new Map<TextEditor, { first: number, last: number, timer: any }>();
+const savedSelections = new Map<TextEditor, Selection[]>();
+const savedRanges = new Map<TextEditor, {
   breaks: Range[],
   debugBreaks: Range[],
   highlights: Range[],
@@ -64,73 +72,174 @@ export function activate(context: ExtensionContext): void {
   }, null, context.subscriptions);
 
   window.onDidChangeVisibleTextEditors(() => {
-    for (const editor of window.visibleTextEditors)
+    const editors = window.visibleTextEditors;
+
+    selectionTimers.forEach((timer, editor) => {
+      if (!editors.includes(editor)) {
+        clearTimeout(timer);
+        selectionTimers.delete(editor);
+      }
+    });
+
+    inProgress.forEach((progress, editor) => {
+      if (!editors.includes(editor)) {
+        if (progress.timer)
+          clearTimeout(progress.timer);
+
+        inProgress.delete(editor);
+      }
+    });
+
+    Array.from(visibleRanges.keys()).forEach(editor => {
+      if (!editors.includes(editor))
+        visibleRanges.delete(editor);
+    });
+
+    for (const editor of editors)
       reviewDocument(editor.document);
   });
 
   window.onDidChangeTextEditorSelection(event => {
-    if (window.visibleTextEditors.includes(event.textEditor)) {
-      const doc = event.textEditor.document;
-      const ranges = savedRanges.get(doc);
-      const lastSelections = savedSelections.get(doc);
+    const editor = event.textEditor;
+    const doc = editor.document;
 
-      savedSelections.set(doc, Array.from(event.selections));
+    if (!window.visibleTextEditors.includes(editor))
+      savedSelections.delete(editor);
+    else if (openDocumentTimers.has(doc) && getEditors(doc)) {
+      if (selectionTimers.has(editor))
+        clearTimeout(selectionTimers.get(editor));
 
-      if (ranges && ranges.background.length === 0) {
-        let first = doc.lineCount;
-        let last = -1;
-        const findSelectionBounds = (s: Selection) => {
-          first = Math.min(s.anchor.line, s.active.line, first);
-          last = Math.max(s.anchor.line, s.active.line, last);
-        };
-        const clearOldRanges = (r: Range[]) => {
-          for (let i = 0; i < r.length; ++i) {
-            const line = r[i].start.line;
+      selectionTimers.set(editor, setTimeout(() => selectionChange(event), OPEN_DOCUMENT_DELAY));
+    }
+    else if (!getEditors(doc)) {
+      const editors = getEditors(doc, true);
 
-            if (first <= line && line <= last)
-              r.splice(i--, 1);
-          }
-        };
+      if (editors)
+        selectionChange(event, editors[0]);
+    }
+  });
 
-        event.selections.forEach(findSelectionBounds);
+  function selectionChange(event: TextEditorSelectionChangeEvent, editor = event.textEditor): void {
+    const doc = editor.document;
+    const lastSelections = savedSelections.get(editor);
 
-        if (lastSelections)
-          lastSelections.forEach(findSelectionBounds);
+    savedSelections.set(editor, Array.from(event.selections));
 
-        clearOldRanges(ranges.breaks);
-        clearOldRanges(ranges.debugBreaks);
-        clearOldRanges(ranges.highlights);
-        reviewDocument(doc, 0, first, last, ranges.breaks, ranges.debugBreaks, ranges.highlights);
+    let first = doc.lineCount;
+    let last = -1;
+    let firstSkip: number;
+    let lastSkip: number;
+    const findSelectionBounds = (s: Selection) => {
+      first = Math.min(s.anchor.line, s.active.line, first);
+      last = Math.max(s.anchor.line, s.active.line, last);
+    };
+
+    event.selections.forEach(findSelectionBounds);
+
+    if (lastSelections) {
+      const saveFirst = first;
+      const saveLast = last;
+
+      first = doc.lineCount;
+      last = -1;
+      lastSelections.forEach(findSelectionBounds);
+
+      if (first > saveLast) {
+        firstSkip = saveLast + 1;
+        lastSkip = first - 1;
+        first = saveFirst;
+      }
+      else if (last < saveFirst) {
+        firstSkip = last + 1;
+        lastSkip = saveFirst - 1;
+        last = saveLast;
       }
       else {
-        savedSelections.delete(doc);
-        reviewDocument(doc);
+        first = Math.min(first, saveFirst);
+        last = Math.max(last, saveLast);
       }
     }
-    else if (event.textEditor.document)
-      savedSelections.delete(event.textEditor.document);
+
+    first = Math.min(first, doc.lineCount - 1);
+
+    if (last >= 0 && first <= last)
+      reviewDocument(doc, 1, first, last, firstSkip, lastSkip);
+  }
+
+  window.onDidChangeTextEditorVisibleRanges(event => {
+    const range = (event.visibleRanges ?? [])[0];
+
+    if (range)
+      visibleRanges.set(event.textEditor, { range, time: processMillis() });
   });
 
   workspace.onDidChangeTextDocument(changeEvent => {
-    if (changeEvent.contentChanges.length > 0)
-      reviewDocument(changeEvent.document);
+    if (changeEvent.contentChanges.length > 0) {
+      onChangeDocument(changeEvent);
+
+      const doc = changeEvent.document;
+      let first = doc.lineCount;
+      let last = -1;
+      let linesChanged = 0;
+
+      changeEvent.contentChanges.forEach(change => {
+        first = Math.min(first, change.range.start.line);
+        last = Math.max(last, change.range.end.line);
+        linesChanged += change.range.end.line - change.range.start.line + 1;
+      });
+
+      last = Math.min(last + linesChanged, doc.lineCount - 1);
+
+      if (last >= 0 && first <= last)
+        reviewDocument(doc, 1, first, last);
+    }
   });
 
   workspace.onDidOpenTextDocument(document => {
-    reviewDocument(document);
+    if (openDocumentTimers.has(document))
+      clearTimeout(openDocumentTimers.get(document));
+
+    openTimes.set(document, processMillis());
+    openDocumentTimers.set(document, setTimeout(() => reviewDocument(document), OPEN_DOCUMENT_DELAY));
   });
 
   workspace.onDidCloseTextDocument(document => {
-    inProgress.delete(document);
+    if (openDocumentTimers.has(document))
+      clearTimeout(openDocumentTimers.get(document));
+
+    openDocumentTimers.delete(document);
+    openTimes.delete(document);
     maxSizeWarningFiles.delete(document);
-    savedRanges.delete(document);
-    savedSelections.delete(document);
+
+    const editors = getEditors(document);
+
+    if (editors)
+      editors.forEach(editor => {
+        if (selectionTimers.has(editor))
+          clearTimeout(selectionTimers.get(editor));
+
+        selectionTimers.delete(editor);
+        visibleRanges.delete(editor);
+        savedRanges.delete(editor);
+        inProgress.delete(editor);
+        savedSelections.delete(editor);
+      });
   });
 
   selectionModeOverride = readConfiguration().selectionMode;
   init();
 
   function init(): void {
+    if (!workspace.getConfiguration().get('editor.fontLigatures') && globalLigatureWarningEnabled) {
+      const option1 = 'OK';
+      const option2 = "Don't warn again this session.";
+      window.showWarningMessage('Ligature fonts are not enabled',
+        option1, option2).then(selection => {
+        if (selection === option2)
+          globalLigatureWarningEnabled = false;
+      });
+    }
+
     workspace.textDocuments.forEach(document => reviewDocument(document));
   }
 
@@ -150,7 +259,6 @@ export function activate(context: ExtensionContext): void {
 
   function cycleSelectionMode(): void {
     selectionModeOverride = selectionModes[(Math.max(selectionModes.indexOf(selectionModeOverride), 0) + 1) % selectionModes.length];
-
     showInfoMessage('Ligature selection disable mode: ' + (selectionModeOverride ?? 'by settings'));
 
     if (currentDocument)
@@ -167,8 +275,8 @@ export function activate(context: ExtensionContext): void {
   }
 
   function reviewDocument(document: TextDocument, attempt = 1, first = 0, last = document.lineCount - 1,
-      breaks?: Range[], debugBreaks?: Range[], highlights?: Range[]): void {
-    if (attempt > MAX_PARSE_RETRY_ATTEMPTS)
+      firstSkip?: number, lastSkip?: number): void {
+    if (attempt > MAX_PARSE_RETRY_ATTEMPTS || first < 0)
       return;
 
     const editors = getEditors(document);
@@ -179,33 +287,95 @@ export function activate(context: ExtensionContext): void {
     currentDocument = document;
 
     if (!scopeInfoApi.getScopeAt(document, new Position(0, 0))) {
-      setTimeout(() => reviewDocument(document, ++attempt, first, last, breaks, debugBreaks, highlights),
+      setTimeout(() => reviewDocument(document, ++attempt, first, last),
         WAIT_FOR_PARSE_RETRY_TIME);
       return;
     }
 
-    editors.forEach(editor => lookForLigatures(document, editor, first, last, breaks, debugBreaks, highlights));
+    editors.forEach(editor => {
+      let ranges = savedRanges.get(editor);
+
+      if (attempt === 1 && ranges && ranges.background.length === 0 && (first !== 0 || last !== document.lineCount - 1) && !inProgress.has(editor)) {
+        const clearOldRanges = (r: Range[]) => {
+          for (let i = 0; i < r.length; ++i) {
+            const line = r[i].start.line;
+
+            if (first <= line && line <= last && (firstSkip === undefined || line < firstSkip || line > lastSkip))
+              r.splice(i--, 1);
+          }
+        };
+
+        clearOldRanges(ranges.breaks);
+        clearOldRanges(ranges.debugBreaks);
+        clearOldRanges(ranges.highlights);
+      }
+      else {
+        first = 0;
+        last = document.lineCount - 1;
+        ranges = undefined;
+      }
+
+      savedSelections.set(editor, editor.selections);
+      lookForLigatures(document, editor, first, last, firstSkip, lastSkip, ranges?.breaks, ranges?.debugBreaks, ranges?.highlights);
+    });
   }
 
+  function clearRanges(r: Range[], first: number, last: number): void {
+    for (let i = 0; i < r.length; ++i) {
+      const line = r[i].start.line;
+
+      if (first <= line && line <= last)
+        r.splice(i--, 1);
+    }
+  };
+
   function lookForLigatures(document: TextDocument, editor: TextEditor, first: number, last: number,
+      firstSkip?: number, lastSkip?: number,
       breaks: Range[] = [], debugBreaks: Range[] = [], highlights: Range[] = [], pass = 0): void {
-    if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor))
+    if (!workspace.textDocuments.includes(document) || !window.visibleTextEditors.includes(editor)) {
+      inProgress.delete(editor);
+
       return;
-    else if (pass === 0 && inProgress.has(document)) {
+    }
+
+    if (pass === 0 && inProgress.has(editor)) {
+      const currentRange = inProgress.get(editor);
+
       if (first > 0 || last < document.lineCount - 1) {
-        const currentRange = inProgress.get(document);
-        inProgress.set(document, { first: Math.min(first, currentRange.first), last: Math.max(last, currentRange.last) });
+        first = Math.min(first, currentRange.first);
+        last = Math.max(last, currentRange.last);
+        clearRanges(breaks, first, last);
+        clearRanges(debugBreaks, first, last);
+        clearRanges(highlights, first, last);
+        inProgress.set(editor, { first, last, timer: currentRange.timer });
+
         return;
       }
       else {
-        inProgress.delete(document);
+        if (currentRange.timer)
+          clearTimeout(currentRange.timer);
+
+        inProgress.delete(editor);
+        firstSkip = lastSkip = undefined;
         breaks.length = 0;
         debugBreaks.length = 0;
         highlights.length = 0;
       }
     }
 
-    const doSort = pass === 0 && (breaks.length > 0 || debugBreaks.length > 0 || highlights.length > 0);
+    const docLanguage = document.languageId;
+    const docLangConfig = readConfiguration(docLanguage);
+
+    if (typeof docLangConfig === 'object' && docLangConfig.deactivated) {
+      editor.setDecorations(allLigatures, []); // This is only needed to signal unit tests that this method has completed.
+
+      return;
+    }
+
+    firstSkip = firstSkip ?? document.lineCount;
+    lastSkip = lastSkip ?? -1;
+
+    let doSort = pass === 0 && (breaks.length > 0 || debugBreaks.length > 0 || highlights.length > 0);
     const background: Range[] = [];
     const fileSize = document.offsetAt(new Position(document.lineCount, 0));
 
@@ -223,105 +393,186 @@ export function activate(context: ExtensionContext): void {
       }
     }
     else if (ligatureSuppression) {
+      last = Math.min(last, document.lineCount - 1);
+
       const started = processMillis();
-      const docLanguage = document.languageId;
-      const docLangConfig = readConfiguration(docLanguage);
-      let lastTokenLanguage: string;
-      let lastTokenConfig: InternalConfig | boolean;
       const matcher = getLigatureMatcher();
+      let firstInView = document.lineCount;
+      let lastInView = -1;
+      const processLines = (first0: number, last0: number, checkTime = true): boolean => {
+        let lastTokenLanguage: string;
+        let lastTokenConfig: InternalConfig | boolean;
 
-      for (let i = first; i <= last; ++i) {
-        const line = document.lineAt(i).text;
-        let match: RegExpExecArray;
+        matcher.lastIndex = 0;
 
-        while ((match = matcher.exec(line))) {
-          const index = match.index;
-          let ligature = match[0];
-          let selected = false;
-          let shortened = false;
-          const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
-          let category = scope.category;
-          const specificScope = _last(scope.scopes);
-          const language = getTokenLanguage(docLanguage, specificScope);
-          let langConfig = docLangConfig;
-          let suppress: boolean;
-          let debug: boolean;
-          let selectionMode: SelectionMode;
+        for (let i = first0; i <= last0; ++i) {
+          if ((firstSkip <= i && i <= lastSkip) || (firstInView <= i && i <= lastInView))
+            continue;
 
-          if (language !== docLanguage) {
-            langConfig = (lastTokenConfig && lastTokenLanguage === language) ? lastTokenConfig :
-              lastTokenConfig = readConfiguration(lastTokenLanguage = language);
-          }
+          const line = document.lineAt(i).text;
+          let match: RegExpExecArray;
+          let lastHighlight: Range;
+          let lastHighlightCategory: string;
 
-          if (typeof langConfig === 'boolean') {
-            suppress = !langConfig;
-            debug = globalDebug;
-            selectionMode = readConfiguration().selectionMode;
-          }
-          else {
-            selectionMode = selectionModeOverride ?? langConfig.selectionMode;
+          const checkToExtendHighlight = (): void => {
+            if (lastHighlight) {
+              const saveIndex = matcher.lastIndex;
+              const extendCandidate = line.substr(lastHighlight.end.character - 2, 3);
 
-            const langLigatures = langConfig.ligatures;
-            const contexts = langConfig.contexts;
-            const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
+              matcher.lastIndex = 1;
 
-            // Did the matched ligature overshoot a token boundary?
-            if (ligature.length > scope.text.length &&
-                !bleedThroughs.has(ligature) && !(category === 'string' && ligature === '\\\\\\')) {
-              shortened = true;
-              matcher.lastIndex -= ligature.length - scope.text.length;
-              ligature = ligature.substr(0, scope.text.length);
+              if (extendCandidate.length === 3 && matcher.test(extendCandidate)) {
+                const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, lastHighlight.end.character + 1))?.category;
+
+                if (candidateCategory === lastHighlightCategory) {
+                  highlights.pop();
+                  highlights.push(new Range(lastHighlight.start, new Position(lastHighlight.end.line, lastHighlight.end.character + 1)));
+                }
+              }
+
+              matcher.lastIndex = saveIndex;
+            }
+          };
+
+          while ((match = matcher.exec(line))) {
+            const index = match.index;
+            let ligature = match[0];
+            let selected = false;
+            let shortened = false;
+            const scope = scopeInfoApi.getScopeAt(document, new Position(i, index));
+            let category = scope.category;
+            const specificScope = _last(scope.scopes);
+            const language = getTokenLanguage(docLanguage, specificScope);
+            let langConfig = docLangConfig;
+            let suppress: boolean;
+            let debug: boolean;
+            let selectionMode: SelectionMode;
+
+            if (language !== docLanguage) {
+              langConfig = (lastTokenConfig && lastTokenLanguage === language) ? lastTokenConfig :
+                lastTokenConfig = readConfiguration(lastTokenLanguage = language);
             }
 
-            // 0x followed by a hex digit is a special case: the 0x part might be the lead-in to a numeric constant,
-            // but treated as a separate keyword.
-            // The same applies to 0o followed by an octal digit, or 0b followed by a binary digit.
-            if (/^0(x[0-9a-fA-F]|o[0-7]|b[01])$/.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
-              const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
+            if (typeof langConfig === 'boolean') {
+              suppress = !langConfig;
+              debug = globalDebug;
+              selectionMode = readConfiguration().selectionMode;
+            }
+            else {
+              selectionMode = selectionModeOverride ?? langConfig.selectionMode;
 
-              if (nextScope.category === 'number')
-                category = 'number';
+              const langLigatures = langConfig.ligatures;
+              const contexts = langConfig.contexts;
+              const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
+
+              // Did the matched ligature overshoot a token boundary?
+              if (ligature.length > scope.text.length &&
+                  !bleedThroughs.has(ligature) && !(category === 'string' && ligature === SLASH3)) {
+                shortened = true;
+                matcher.lastIndex -= ligature.length - scope.text.length;
+                ligature = ligature.substr(0, scope.text.length);
+              }
+
+              // 0x followed by a hex digit is a special case: the 0x part might be the lead-in to a numeric constant,
+              // but treated as a separate keyword.
+              // The same applies to 0o followed by an octal digit, or 0b followed by a binary digit.
+              if (/^0(x[0-9a-fA-F]|o[0-7]|b[01])$/.test(ligature) && category === 'keyword' && index + ligature.length < line.length) {
+                const nextScope = scopeInfoApi.getScopeAt(document, new Position(i, index + ligature.length));
+
+                if (nextScope.category === 'number')
+                  category = 'number';
+              }
+
+              const contextConfig = findContextConfig(langConfig, specificScope, category);
+              const contextLigatures = contextConfig?.ligatures ?? langLigatures;
+              const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
+
+              debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
+              suppress = shortened || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category);
             }
 
-            const contextConfig = findContextConfig(langConfig, specificScope, category);
-            const contextLigatures = contextConfig?.ligatures ?? langLigatures;
-            const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
+            if (selectionMode !== 'off' && editor.selections?.length > 0 &&
+                (isInsert(editor.selections, i, index, ligature.length) || selectionMode !== 'cursor')) {
+              const range = selectionMode === 'line' ?
+                new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
 
-            debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
-            suppress = shortened || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category);
-          }
+              for (let j = 0; j < editor.selections.length && !selected; ++j) {
+                const selection = editor.selections[j];
 
-          if (selectionMode !== 'off' && editor.selections?.length > 0 &&
-              (isInsert(editor.selections, i, index, ligature.length) || selectionMode !== 'cursor')) {
-            const range = selectionMode === 'line' ?
-              new Range(i, 0, i, line.length) : new Range(i, index, i, index + ligature.length);
+                selected = (selectionMode === 'line' ? selection.active.line === i : !!selection.intersection(range));
+              }
+            }
 
-            for (let j = 0; j < editor.selections.length && !selected; ++j) {
-              const selection = editor.selections[j];
+            if (suppress || selected) {
+              for (let j = 0; j < ligature.length; ++j)
+                (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
 
-              selected = (selectionMode === 'line' ? selection.active.line === i : !!selection.intersection(range));
+              checkToExtendHighlight();
+            }
+            else if (debug) {
+              let highlight = new Range(i, index, i, index + ligature.length);
+
+              if (lastHighlight && lastHighlight.end.character === highlight.start.character && lastHighlightCategory === category) {
+                highlights.pop();
+                highlight = new Range(lastHighlight.start, highlight.end);
+              }
+              else
+                checkToExtendHighlight();
+
+              highlights.push(highlight);
+              lastHighlight = highlight;
+              lastHighlightCategory = category;
             }
           }
 
-          if (suppress || selected) {
-            for (let j = 0; j < ligature.length; ++j)
-              (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
+          checkToExtendHighlight();
+
+          if (checkTime && processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
+            inProgress.set(editor, {
+              first: i + 1,
+              last,
+              timer: setTimeout(() => {
+                const currentRange = inProgress.get(editor);
+
+                if (currentRange)
+                  lookForLigatures(document, editor, currentRange.first, currentRange.last, undefined, undefined,
+                    breaks, debugBreaks, highlights, pass + 1);
+              }, PROCESS_YIELD_TIME)
+            });
+
+            return true;
           }
-          else if (debug)
-            highlights.push(new Range(i, index, i, index + ligature.length));
         }
 
-        if (processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
-          inProgress.set(document, { first: i + 1, last });
-          setTimeout(() => {
-            const currentRange = inProgress.get(document);
+        return false;
+      };
 
-            if (currentRange)
-              lookForLigatures(document, editor, currentRange.first, currentRange.last, breaks, debugBreaks, highlights, pass + 1);
-          }, PROCESS_YIELD_TIME);
-          return;
-        }
+      // Take care of what's currently visible on screen first.
+      if (pass === 0 && editor.visibleRanges?.length === 1) {
+        let range = editor.visibleRanges[0];
+        // Oddly enough, a visible range reported by a recent onDidChangeTextEditorVisibleRanges event
+        // will be more accurate than the visible range info inside the editor object itself.
+        const lastRange = visibleRanges.get(editor);
+
+        if (lastRange && processMillis() < lastRange.time + RANGE_DELAY)
+          range = lastRange.range;
+
+        const viewFirst = Math.max(first, Math.min(range.start.line - 1, range.end.line - 1));
+        const viewLast = Math.min(last, Math.max(range.start.line + 1, range.end.line + 1));
+
+        processLines(viewFirst, viewLast, false);
+        editor.setDecorations(breakNormal, breaks);
+        editor.setDecorations(breakDebug, debugBreaks);
+        editor.setDecorations(highlightLigature, highlights);
+        editor.setDecorations(allLigatures, background);
+
+        firstInView = viewFirst;
+        lastInView = viewLast;
+        doSort = true;
       }
+
+      if (processLines(first, last))
+        return;
     }
     else
       background.push(new Range(0, 0, last + 1, 0));
@@ -338,8 +589,8 @@ export function activate(context: ExtensionContext): void {
     editor.setDecorations(breakDebug, debugBreaks);
     editor.setDecorations(highlightLigature, highlights);
     editor.setDecorations(allLigatures, background);
-    inProgress.delete(document);
-    savedRanges.set(document, { breaks, debugBreaks, highlights, background });
+    savedRanges.set(editor, { breaks, debugBreaks, highlights, background });
+    inProgress.delete(editor);
   }
 }
 
@@ -383,12 +634,13 @@ function isValidDocument(document: TextDocument): boolean {
     document.uri.scheme !== 'vscode' && document.uri.scheme !== 'output');
 }
 
-function getEditors(document: TextDocument): TextEditor[] {
-  const editors: TextEditor[] = [];
+function getEditors(document: TextDocument, tryHarder = false): TextEditor[] {
+  let editors: TextEditor[] = window.visibleTextEditors.filter(editor => editor.document === document);
 
-  for (const editor of window.visibleTextEditors) {
-    if (editor.document === document)
-      editors.push(editor);
+  if (editors.length === 0 && tryHarder && document.fileName.endsWith('.git')) {
+    const name = document.fileName.substr(0, document.fileName.length - 4);
+
+    editors = window.visibleTextEditors.filter(editor => editor.document.fileName === name);
   }
 
   return editors.length > 0 ? editors : undefined;

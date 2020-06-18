@@ -1,3 +1,10 @@
+## 1.3.0
+
+* Further improved the speed and performance of the extension when working with large files, especially when interacting with other extensions such as [Overtype](https://marketplace.visualstudio.com/items?itemName=adammaras.overtype) and [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one).
+* The default for Markdown documents is now to display all ligatures throughout these documents, unless _Ligatures Limited_ is configured otherwise.
+* The ligatures `ff`, `fi`, `fl`, `ffi`, and `ffl` are now rendered in all contexts by default. (You can change your configuration suppress these ligatures, which you may wish to do when using a font which, for example, renders `fi` within the width of a single character, instead of as two characters.)
+* Cleaned up some console errors being thrown which were harmless to the functioning of the extension, but nevertheless annoying.
+
 ## 1.2.0
 
 * Fixed problem with unresponsive behavior when editing large files.
