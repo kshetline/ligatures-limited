@@ -1,3 +1,7 @@
+## 1.3.1
+
+* Fix selection mode bug.
+
 ## 1.3.0
 
 * Further improved the speed and performance of the extension when working with large files, especially when interacting with other extensions such as [Overtype](https://marketplace.visualstudio.com/items?itemName=adammaras.overtype) and [Markdown All in One](https://marketplace.visualstudio.com/items?itemName=yzhang.markdown-all-in-one).

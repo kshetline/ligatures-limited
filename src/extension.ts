@@ -117,6 +117,8 @@ export function activate(context: ExtensionContext): void {
       if (editors)
         selectionChange(event, editors[0]);
     }
+    else
+      selectionChange(event);
   });
 
   function selectionChange(event: TextEditorSelectionChangeEvent, editor = event.textEditor): void {
@@ -456,7 +458,7 @@ export function activate(context: ExtensionContext): void {
             if (typeof langConfig === 'boolean') {
               suppress = !langConfig;
               debug = globalDebug;
-              selectionMode = readConfiguration().selectionMode;
+              selectionMode = selectionModeOverride ?? readConfiguration().selectionMode;
             }
             else {
               selectionMode = selectionModeOverride ?? langConfig.selectionMode;
