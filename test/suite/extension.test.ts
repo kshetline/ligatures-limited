@@ -74,7 +74,7 @@ async function getDecorations(fileName: string, clearOnAny = false): Promise<Dec
     expect(decoration).to.be.ok;
 
     if (ligatureDecorations.includes(decoration)) {
-      if (decoration === breakNormal && clearOnAny)
+      if (decoration === breakNormal || clearOnAny)
         decorations.clear();
 
       decorations.set(decoration.key, ranges);
@@ -101,8 +101,8 @@ suite('Extension Tests', () => {
   });
 
   it('should find ligatures in HTML document', async function () {
-    this.slow(1000);
-    this.timeout(2000);
+    this.slow(1500);
+    this.timeout(3000);
     const decorations = await getDecorations('sample.html');
     expect(decorations).to.be.ok;
 
@@ -126,8 +126,8 @@ suite('Extension Tests', () => {
   });
 
   it('should find no suppressed ligatures in sample Markdown', async function () {
-    this.slow(1000);
-    this.timeout(2000);
+    this.slow(1500);
+    this.timeout(3000);
     const decorations = await getDecorations('sample.md');
     expect(decorations).to.be.ok;
     // After line 16 there will be suppressed ligatures inside an XML block
@@ -167,8 +167,8 @@ suite('Extension Tests', () => {
   });
 
   it('should find extended mixed ligatures and prioritize the |> part of =|>', async function () {
-    this.slow(1000);
-    this.timeout(2000);
+    this.slow(150);
+    this.timeout(3000);
     const decorations = await getDecorations('sample.md');
     expect(decorations).to.be.ok;
     expect(isCorrectlyDecorated(decorations, 3, 67, 11, highlightLigature), 'md >>--|--||->').to.be.ok;
@@ -176,8 +176,8 @@ suite('Extension Tests', () => {
   });
 
   it('should find no ligatures in C document with ligatures disabled by VSCode', async function () {
-    this.slow(1000);
-    this.timeout(2000);
+    this.slow(1500);
+    this.timeout(3000);
     const decorations = await getDecorations('sample.c', true);
     expect(decorations).to.be.ok;
     expect(decorations.get(breakNormal.key)?.length ?? 0).to.equal(0);
