@@ -1,3 +1,7 @@
+## 1.3.2
+
+* Fix `</` ligature.
+
 ## 1.3.1
 
 * Fix selection mode bug.
