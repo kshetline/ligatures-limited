@@ -1,6 +1,6 @@
 ## 1.3.3
 
-* Improve detection of `0b` ligature.
+* Improve detection of `0b1` ligature.
 
 ## 1.3.2
 
