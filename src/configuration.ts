@@ -88,7 +88,7 @@ const patternSubstitutions: any = {
   '<~~~>': '<~{3,}>',
   '0xF': '0x[0-9a-fA-F]',
   '0o7': '0o[0-7]',
-  '0b1': '0b[01]',
+  '0b1': '(?<![0-9a-fA-FxX])0b[01]',
   '9x9': '\\dx\\d'
 };
 /* eslint-enable quote-props */

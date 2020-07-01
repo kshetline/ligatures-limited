@@ -1,3 +1,7 @@
+## 1.3.3
+
+* Improve detection of `0b` ligature.
+
 ## 1.3.2
 
 * Fix `</` ligature.
