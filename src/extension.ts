@@ -416,19 +416,25 @@ export function activate(context: ExtensionContext): void {
           let lastHighlight: Range;
           let lastHighlightCategory: string;
 
-          const checkToExtendHighlight = (): void => {
-            if (lastHighlight) {
+          const checkToExtendHighlight = (lastCategory: string = null): void => {
+            if (lastCategory || lastHighlight) {
+              const hl = lastCategory ? _last(debugBreaks) : lastHighlight;
+              const category = lastCategory ?? lastHighlightCategory;
               const saveIndex = matcher.lastIndex;
-              const extendCandidate = line.substr(lastHighlight.end.character - 2, 3);
+              const extendCandidate = line.substr(hl.end.character - 2, 3);
 
-              matcher.lastIndex = 1;
+              matcher.lastIndex = (extendCandidate === '==/' ? 0 : 1); // Special case, since =/ by itself isn't a ligature.
 
               if (extendCandidate.length === 3 && matcher.test(extendCandidate)) {
-                const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, lastHighlight.end.character + 1))?.category;
+                const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, hl.end.character + 1))?.category;
 
-                if (candidateCategory === lastHighlightCategory) {
-                  highlights.pop();
-                  highlights.push(new Range(lastHighlight.start, new Position(lastHighlight.end.line, lastHighlight.end.character + 1)));
+                if (candidateCategory === category) {
+                  if (lastCategory)
+                    debugBreaks.push(new Range(hl.end.line, hl.end.character, hl.end.line, hl.end.character + 1));
+                  else {
+                    highlights.pop();
+                    highlights.push(new Range(hl.start, new Position(hl.end.line, hl.end.character + 1)));
+                  }
                 }
               }
 
@@ -489,6 +495,7 @@ export function activate(context: ExtensionContext): void {
               const contextLigaturesMatch = contextConfig?.ligaturesMatch ?? langLigaturesMatch;
               const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
 
+              contextLigaturesMatch.lastIndex = 0;
               debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
               suppress = shortened || contextLigaturesMatch.test(ligature) !== listedAreEnabled ||
                 !matchesContext(contexts, specificScope, category);
@@ -510,7 +517,8 @@ export function activate(context: ExtensionContext): void {
               for (let j = 0; j < ligature.length; ++j)
                 (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
 
-              checkToExtendHighlight();
+              if (debug)
+                checkToExtendHighlight(category);
             }
             else if (debug) {
               let highlight = new Range(i, index, i, index + ligature.length);
