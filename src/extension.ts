@@ -416,30 +416,20 @@ export function activate(context: ExtensionContext): void {
           let lastHighlight: Range;
           let lastHighlightCategory: string;
 
-          const checkToExtendHighlight = (lastCategory: string = null): void => {
-            if (lastCategory || lastHighlight) {
-              const hl = lastCategory ? _last(debugBreaks) : lastHighlight;
-              const category = lastCategory ?? lastHighlightCategory;
-              const saveIndex = matcher.lastIndex;
-              const extendCandidate = line.substr(hl.end.character - 2, 3);
+          const extendedLength = (charEnd: number, category: string): number => {
+            const saveIndex = matcher.lastIndex;
+            const extendCandidate = line.substr(charEnd - 2, 3);
+            let result = 0;
 
-              matcher.lastIndex = (extendCandidate === '==/' ? 0 : 1); // Special case, since =/ by itself isn't a ligature.
+            matcher.lastIndex = (extendCandidate === '==/' ? 0 : 1); // Special case, since =/ by itself isn't a known ligature.
 
-              if (extendCandidate.length === 3 && matcher.test(extendCandidate)) {
-                const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, hl.end.character + 1))?.category;
+            if (extendCandidate.length === 3 && matcher.test(extendCandidate) &&
+                scopeInfoApi.getScopeAt(document, new Position(i, charEnd + 1))?.category === category)
+              result = 1;
 
-                if (candidateCategory === category) {
-                  if (lastCategory)
-                    debugBreaks.push(new Range(hl.end.line, hl.end.character, hl.end.line, hl.end.character + 1));
-                  else {
-                    highlights.pop();
-                    highlights.push(new Range(hl.start, new Position(hl.end.line, hl.end.character + 1)));
-                  }
-                }
-              }
+            matcher.lastIndex = saveIndex;
 
-              matcher.lastIndex = saveIndex;
-            }
+            return result;
           };
 
           while ((match = matcher.exec(line))) {
@@ -514,29 +504,34 @@ export function activate(context: ExtensionContext): void {
             }
 
             if (suppress || selected) {
-              for (let j = 0; j < ligature.length; ++j)
-                (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
+              const length = ligature.length + extendedLength(index + ligature.length, category);
+              const theBreaks = (debug ? debugBreaks : breaks);
+              const lastBreak = _last(theBreaks);
 
-              if (debug)
-                checkToExtendHighlight(category);
+              if (lastBreak && lastBreak.start.line === i && lastBreak.start.character === index)
+                theBreaks.pop();
+
+              for (let j = 0; j < length; ++j)
+                theBreaks.push(new Range(i, index + j, i, index + j + 1));
             }
             else if (debug) {
-              let highlight = new Range(i, index, i, index + ligature.length);
+              const length = ligature.length + extendedLength(index + ligature.length, category);
+              let highlight = new Range(i, index, i, index + length);
 
-              if (lastHighlight && lastHighlight.end.character === highlight.start.character && lastHighlightCategory === category) {
-                highlights.pop();
-                highlight = new Range(lastHighlight.start, highlight.end);
+              if (lastHighlight && lastHighlightCategory === category) {
+                const diff = lastHighlight.end.character - highlight.start.character;
+
+                if (diff === 0 || diff === 1) {
+                  highlights.pop();
+                  highlight = new Range(lastHighlight.start, highlight.end);
+                }
               }
-              else
-                checkToExtendHighlight();
 
               highlights.push(highlight);
               lastHighlight = highlight;
               lastHighlightCategory = category;
             }
           }
-
-          checkToExtendHighlight();
 
           if (checkTime && processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
             inProgress.set(editor, {
