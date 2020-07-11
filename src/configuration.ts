@@ -6,6 +6,11 @@ export type SelectionMode = 'cursor' | 'line' | 'off' | 'selection';
 export const DEFAULT_MAX_LINES = 20_000;
 export const DEFAULT_MAX_FILE_SIZE = 35_000_000;
 
+// The \ escape before the second [ is considered unnecessary here by ESLint,
+// but being left out is an error for some regex parsers.
+// eslint-disable-next-line no-useless-escape
+const charsNeedingRegexEscape = /[-\[\]/{}()*+?.\\^$|]/g;
+
 interface LLConfiguration {
   compactScopeDisplay?: boolean;
   contexts?: string | string[];
@@ -26,6 +31,7 @@ interface LLConfiguration {
 export interface ContextConfig {
   debug: boolean;
   ligatures: Set<string>;
+  ligaturesMatch: RegExp;
   ligaturesListedAreEnabled: boolean;
 }
 
@@ -35,6 +41,7 @@ export interface InternalConfig {
   deactivated: boolean;
   debug: boolean;
   ligatures: Set<string>;
+  ligaturesMatch: RegExp;
   ligaturesByContext: Record<string, ContextConfig>;
   ligaturesListedAreEnabled: boolean;
   maxFileSize: number,
@@ -48,6 +55,7 @@ const FALLBACK_CONFIG: InternalConfig = {
   deactivated: false,
   debug: false,
   ligatures: new Set<string>(),
+  ligaturesMatch: /\x00/,
   ligaturesByContext: {},
   ligaturesListedAreEnabled: false,
   maxFileSize: DEFAULT_MAX_FILE_SIZE,
@@ -104,6 +112,7 @@ const baseLigaturesByContext = {
   number: {
     debug: false,
     ligatures: new Set(baseDisabledLigatures),
+    ligaturesMatch: null as RegExp,
     ligaturesListedAreEnabled: false
   }
 };
@@ -111,16 +120,12 @@ const baseLigaturesByContext = {
 baseLigaturesByContext.number.ligatures.delete('0xF');
 baseLigaturesByContext.number.ligatures.delete('0o7');
 baseLigaturesByContext.number.ligatures.delete('0b1');
+baseLigaturesByContext.number.ligaturesMatch = ligaturesToRegex(baseLigaturesByContext.number.ligatures);
 
 let defaultConfiguration: InternalConfig;
 const configurationsByLanguage = new Map<string, InternalConfig>();
 let globalLigatures: Set<string>;
 let globalMatchLigatures: RegExp;
-
-// The \ escape before the second [ is considered unnecessary here by ESLint,
-// but being left out is an error for some regex parsers.
-// eslint-disable-next-line no-useless-escape
-const charsNeedingRegexEscape = /[-\[\]/{}()*+?.\\^$|]/g;
 
 export function resetConfiguration(): void {
   defaultConfiguration = undefined;
@@ -139,7 +144,12 @@ export function readConfiguration(language: string): InternalConfig | boolean;
 
 export function readConfiguration(language?: string): InternalConfig | boolean {
   try {
-    return readConfigurationAux(language);
+    const config = readConfigurationAux(language);
+
+    if (typeof config === 'object' && config.ligatures && !(config.ligaturesMatch instanceof RegExp))
+      config.ligaturesMatch = ligaturesToRegex(config.ligatures);
+
+    return config;
   }
   catch (e) {
     console.error(e);
@@ -224,6 +234,9 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
       if (userConfig.inherit) {
         loopCheck.add(language);
         template = readConfigurationAux(userConfig.inherit, loopCheck);
+
+        if (typeof template === 'object')
+          template.ligaturesMatch = null;
       }
     }
   }
@@ -255,6 +268,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
       deactivated,
       debug: false,
       ligatures: new Set(baseDisabledLigatures),
+      ligaturesMatch: null as RegExp,
       ligaturesByContext: baseLigaturesByContext,
       ligaturesListedAreEnabled: false,
       maxFileSize: DEFAULT_MAX_FILE_SIZE,
@@ -269,6 +283,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     deactivated,
     debug: userConfig?.debug ?? template.debug,
     ligatures: new Set(template.ligatures),
+    ligaturesMatch: template.ligaturesMatch,
     ligaturesByContext: clone(template.ligaturesByContext),
     ligaturesListedAreEnabled: template.ligaturesListedAreEnabled,
     maxFileSize: userConfig?.maxFileSize ?? template.maxFileSize,
@@ -303,6 +318,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     const contextConfig = {
       debug,
       ligatures: new Set(internalConfig.ligatures),
+      ligaturesMatch: internalConfig.ligaturesMatch,
       ligaturesListedAreEnabled: internalConfig.ligaturesListedAreEnabled,
     };
 
@@ -315,12 +331,7 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     });
   }
 
-  const allLigatures = Array.from(globalLigatures);
-
-  allLigatures.sort((a, b) => b.length - a.length); // Sort from longest to shortest
-  globalMatchLigatures = new RegExp(allLigatures.map(lig =>
-    patternSubstitutions[lig] ?? generatePattern(lig, allLigatures)
-  ).join('|'), 'g');
+  globalMatchLigatures = ligaturesToRegex(globalLigatures);
 
   if (!language)
     defaultConfiguration = internalConfig;
@@ -328,6 +339,16 @@ function readConfigurationAux(language?: string, loopCheck = new Set<string>()):
     configurationsByLanguage.set(language, internalConfig);
 
   return internalConfig;
+}
+
+export function ligaturesToRegex(ligatures: string[] | Set<string>): RegExp {
+  if (!Array.isArray(ligatures))
+    ligatures = Array.from(ligatures);
+
+  ligatures.sort((a, b) => b.length - a.length); // Sort from longest to shortest
+
+  return new RegExp(ligatures.map(lig => patternSubstitutions[lig] ??
+    generatePattern(lig, ligatures as string[])).join('|'), 'g');
 }
 
 // The major purpose of this function is escaping ligature characters so that they
@@ -471,7 +492,7 @@ function applyContextList(contextsToEnable: Set<string>, specs: string | string[
         enable = true;
       else if (spec === '-')
         enable = false;
-      else if (spec === '0') {
+      else if (spec === '0' || spec.toUpperCase() === 'O') {
         contextsToEnable.clear();
         enable = true;
       }

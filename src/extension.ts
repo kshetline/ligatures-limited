@@ -5,8 +5,8 @@
 // vscode-Disable-Ligatures.
 
 import {
-  ContextConfig, DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_LINES, getLigatureMatcher, InternalConfig, readConfiguration,
-  resetConfiguration, SelectionMode
+  ContextConfig, DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_LINES, getLigatureMatcher, InternalConfig, ligaturesToRegex,
+  readConfiguration, resetConfiguration, SelectionMode
 } from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
@@ -463,7 +463,7 @@ export function activate(context: ExtensionContext): void {
             else {
               selectionMode = selectionModeOverride ?? langConfig.selectionMode;
 
-              const langLigatures = langConfig.ligatures;
+              const langLigaturesMatch = langConfig.ligaturesMatch;
               const contexts = langConfig.contexts;
               const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
 
@@ -486,11 +486,12 @@ export function activate(context: ExtensionContext): void {
               }
 
               const contextConfig = findContextConfig(langConfig, specificScope, category);
-              const contextLigatures = contextConfig?.ligatures ?? langLigatures;
+              const contextLigaturesMatch = contextConfig?.ligaturesMatch ?? langLigaturesMatch;
               const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
 
               debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
-              suppress = shortened || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category);
+              suppress = shortened || contextLigaturesMatch.test(ligature) !== listedAreEnabled ||
+                !matchesContext(contexts, specificScope, category);
             }
 
             if (selectionMode !== 'off' && editor.selections?.length > 0 &&
@@ -615,6 +616,9 @@ function findContextConfig(config: InternalConfig, scope: string, category: stri
 
   while (!match && scope && !(match = byContext[scope]))
     scope = (/^(.+)\../.exec(scope) ?? [])[1];
+
+  if (match && match.ligatures && !(match.ligaturesMatch instanceof RegExp))
+    match.ligaturesMatch = ligaturesToRegex(match.ligatures);
 
   return match;
 }
