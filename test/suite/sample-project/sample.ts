@@ -1,5 +1,5 @@
-// www !== <=
-/* www !== >= */
+// www !== <= 0xA 2x3
+/* www !== >= 0xA 2x3 */
 export function foo(): void {
   const a = Math.random();
   const b = Math.random();

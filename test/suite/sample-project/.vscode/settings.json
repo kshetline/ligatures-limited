@@ -20,7 +20,7 @@
     "css, javascript": {
       "ligaturesByContext": {
         "comment.block": {
-          "ligatures": "0 www"
+          "ligatures": "0 www 0xF 9x9"
         }
       }
     },
@@ -33,7 +33,12 @@
     },
     "typescript": {
       "inherit": "javascript",
-      "ligatures": "- !="
+      "ligatures": "- !=",
+      "ligaturesByContext": {
+        "comment.line": {
+          "ligatures": "X www !== <= 9x9 0xF 9x9"
+        }
+      }
     },
     "markdown": true,
     "plaintext, json, jsonc, json5": false

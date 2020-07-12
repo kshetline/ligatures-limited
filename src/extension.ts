@@ -5,8 +5,8 @@
 // vscode-Disable-Ligatures.
 
 import {
-  ContextConfig, DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_LINES, getLigatureMatcher, InternalConfig, readConfiguration,
-  resetConfiguration, SelectionMode
+  ContextConfig, DEFAULT_MAX_FILE_SIZE, DEFAULT_MAX_LINES, getLigatureMatcher, InternalConfig, ligaturesToRegex,
+  readConfiguration, resetConfiguration, SelectionMode
 } from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
 import { last as _last, processMillis } from 'ks-util';
@@ -314,6 +314,7 @@ export function activate(context: ExtensionContext): void {
       else {
         first = 0;
         last = document.lineCount - 1;
+        firstSkip = lastSkip = undefined;
         ranges = undefined;
       }
 
@@ -416,24 +417,20 @@ export function activate(context: ExtensionContext): void {
           let lastHighlight: Range;
           let lastHighlightCategory: string;
 
-          const checkToExtendHighlight = (): void => {
-            if (lastHighlight) {
-              const saveIndex = matcher.lastIndex;
-              const extendCandidate = line.substr(lastHighlight.end.character - 2, 3);
+          const extendedLength = (charEnd: number, category: string): number => {
+            const saveIndex = matcher.lastIndex;
+            const extendCandidate = line.substr(charEnd - 2, 3);
+            let result = 0;
 
-              matcher.lastIndex = 1;
+            matcher.lastIndex = (extendCandidate === '==/' ? 0 : 1); // Special case, since =/ by itself isn't a known ligature.
 
-              if (extendCandidate.length === 3 && matcher.test(extendCandidate)) {
-                const candidateCategory = scopeInfoApi.getScopeAt(document, new Position(i, lastHighlight.end.character + 1))?.category;
+            if (extendCandidate.length === 3 && matcher.test(extendCandidate) &&
+                scopeInfoApi.getScopeAt(document, new Position(i, charEnd + 1))?.category === category)
+              result = 1;
 
-                if (candidateCategory === lastHighlightCategory) {
-                  highlights.pop();
-                  highlights.push(new Range(lastHighlight.start, new Position(lastHighlight.end.line, lastHighlight.end.character + 1)));
-                }
-              }
+            matcher.lastIndex = saveIndex;
 
-              matcher.lastIndex = saveIndex;
-            }
+            return result;
           };
 
           while ((match = matcher.exec(line))) {
@@ -463,7 +460,7 @@ export function activate(context: ExtensionContext): void {
             else {
               selectionMode = selectionModeOverride ?? langConfig.selectionMode;
 
-              const langLigatures = langConfig.ligatures;
+              const langLigaturesMatch = langConfig.ligaturesMatch;
               const contexts = langConfig.contexts;
               const langListedAreEnabled = langConfig.ligaturesListedAreEnabled;
 
@@ -486,11 +483,13 @@ export function activate(context: ExtensionContext): void {
               }
 
               const contextConfig = findContextConfig(langConfig, specificScope, category);
-              const contextLigatures = contextConfig?.ligatures ?? langLigatures;
+              const contextLigaturesMatch = contextConfig?.ligaturesMatch ?? langLigaturesMatch;
               const listedAreEnabled = contextConfig?.ligaturesListedAreEnabled ?? langListedAreEnabled;
 
+              contextLigaturesMatch.lastIndex = 0;
               debug = globalDebug ?? contextConfig?.debug ?? langConfig.debug;
-              suppress = shortened || contextLigatures.has(ligature) !== listedAreEnabled || !matchesContext(contexts, specificScope, category);
+              suppress = shortened || contextLigaturesMatch.test(ligature) !== listedAreEnabled ||
+                !matchesContext(contexts, specificScope, category);
             }
 
             if (selectionMode !== 'off' && editor.selections?.length > 0 &&
@@ -506,28 +505,34 @@ export function activate(context: ExtensionContext): void {
             }
 
             if (suppress || selected) {
-              for (let j = 0; j < ligature.length; ++j)
-                (debug ? debugBreaks : breaks).push(new Range(i, index + j, i, index + j + 1));
+              const length = ligature.length + extendedLength(index + ligature.length, category);
+              const theBreaks = (debug ? debugBreaks : breaks);
+              const lastBreak = _last(theBreaks);
 
-              checkToExtendHighlight();
+              if (lastBreak && lastBreak.start.line === i && lastBreak.start.character === index)
+                theBreaks.pop();
+
+              for (let j = 0; j < length; ++j)
+                theBreaks.push(new Range(i, index + j, i, index + j + 1));
             }
             else if (debug) {
-              let highlight = new Range(i, index, i, index + ligature.length);
+              const length = ligature.length + extendedLength(index + ligature.length, category);
+              let highlight = new Range(i, index, i, index + length);
 
-              if (lastHighlight && lastHighlight.end.character === highlight.start.character && lastHighlightCategory === category) {
-                highlights.pop();
-                highlight = new Range(lastHighlight.start, highlight.end);
+              if (lastHighlight && lastHighlightCategory === category) {
+                const diff = lastHighlight.end.character - highlight.start.character;
+
+                if (diff === 0 || diff === 1) {
+                  highlights.pop();
+                  highlight = new Range(lastHighlight.start, highlight.end);
+                }
               }
-              else
-                checkToExtendHighlight();
 
               highlights.push(highlight);
               lastHighlight = highlight;
               lastHighlightCategory = category;
             }
           }
-
-          checkToExtendHighlight();
 
           if (checkTime && processMillis() > started + MAX_TIME_FOR_PROCESSING_LINES) {
             inProgress.set(editor, {
@@ -615,6 +620,9 @@ function findContextConfig(config: InternalConfig, scope: string, category: stri
 
   while (!match && scope && !(match = byContext[scope]))
     scope = (/^(.+)\../.exec(scope) ?? [])[1];
+
+  if (match && match.ligatures && !(match.ligaturesMatch instanceof RegExp))
+    match.ligaturesMatch = ligaturesToRegex(match.ligatures);
 
   return match;
 }

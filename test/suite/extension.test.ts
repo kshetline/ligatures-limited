@@ -146,10 +146,14 @@ suite('Extension Tests', () => {
     expect(isCorrectlyDecorated(decorations, 1, 4, 3, breakDebug), 'ts www in lc').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 1, 8, 3, breakDebug), 'ts !== in lc').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 1, 12, 2, breakDebug), 'ts <= in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 15, 3, breakDebug), 'ts 0xA in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 19, 3, breakDebug), 'ts 2x3 in lc').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 2, 4, 3, highlightLigature), 'ts www in bc').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 2, 8, 3, breakDebug), 'ts !== in bc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 2, 12, 2, breakDebug), 'ts >= in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 2, 12, 2, breakDebug), 'ts >= in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 2, 15, 3, highlightLigature), 'ts 0xA in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 2, 19, 3, highlightLigature), 'ts 2x3 in bc').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 9, 9, 2, highlightLigature), 'ts <=').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 9, 19, 2, highlightLigature), 'ts >=').to.be.ok;
