@@ -1,6 +1,7 @@
 ## 1.3.3
 
 * Improve detection of variable-form ligatures.
+* Fix re-highlight problem when switching to an editor with selection at the bottom of the document.
 
 ## 1.3.2
 

@@ -314,6 +314,7 @@ export function activate(context: ExtensionContext): void {
       else {
         first = 0;
         last = document.lineCount - 1;
+        firstSkip = lastSkip = undefined;
         ranges = undefined;
       }
 
