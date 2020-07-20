@@ -2,7 +2,7 @@
 
 ## Code ligatures _only where you want them_, not where you don’t
 
-I enjoy using ligature fonts for coding so that symbols like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/fat_arrow_nolig.png" width="16" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow no ligature">) look like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/fat_arrow.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow ligature">) and does-not-equal signs (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/not_equal_nolig.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal no ligature">) look like the real thing from math class (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/not_equal.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal ligature">). The problem is that, even with some of the contextual smarts built into ligature fonts like Fira Code, ligatures have a knack of popping up where you don’t want them.
+I enjoy using ligature fonts for coding so that symbols like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/fat_arrow_nolig.png" width="16" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow no ligature">) look like arrows (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/fat_arrow.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="fat arrow ligature">) and does-not-equal signs (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/not_equal_nolig.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal no ligature">) look like the real thing from math class (<img src="https://shetline.com/readme/ligatures-limited/v1.3.0/not_equal.png" width="17" height="14" align="absmiddle" style="display: inline-block; position: relative; top: -0.075em" alt="not-equal ligature">). The problem is that, even with the contextual smarts built into ligature fonts like Fira Code, ligatures have a knack of popping up where you don’t want them.
 
 <img src="https://shetline.com/readme/ligatures-limited/v1.3.0/without_suppressed_ligatures.jpg" width="407" height="67" alt="Without ligature suppression">
 <br>
@@ -102,7 +102,7 @@ Rules for a language can be inherited from rules for another language by using t
 
 ### Context lists
 
-Ligatures are _not_ rendered unless they appear inside an explicitly listed context. To add or remove contexts from the inherited rules, simply list them in a space-separated string like this:
+Ligatures are _not_ rendered unless they appear inside an explicitly listed context. These contexts are by default very limited since the value of most ligatures is their use as operators and punctuation. To add or remove contexts from the inherited rules, simply list them in a space-separated string like this:
 
 `"regexp comment.line.double-slash.ts - comment.block.ts"`
 
@@ -116,7 +116,7 @@ These work much like context lists, except that an explicit `+` sign is needed t
 
 This example adds the first two ligatures for rendering, and causes the last two to be suppressed.
 
-Ligature lists can also “start fresh”, clearing inherited ligatures. A leading `0` suppresses all ligatures, after which you can list just the ligatures you want to see.
+Ligature lists can also “start fresh”, clearing inherited ligatures. A leading `0` suppresses all ligatures, after which you can list just the ligatures you want to see rendered.
 
 A leading `X` enables all ligatures, after which you can list just the ligatures you want to suppress.
 

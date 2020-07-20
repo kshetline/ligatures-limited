@@ -103,7 +103,7 @@ const patternSubstitutions: any = {
 
 let disregarded: string[] = [];
 const defaultDisregarded = ['ff', 'fi', 'fl', 'ffi', 'ffl'];
-const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', '0xF', '0o7', '0b1', '9x9']);
+const baseDisabledLigatures = new Set<string>(['ff', 'fi', 'fl', 'ffi', 'ffl', 'www', '0xF', '0o7', '0b1', '9x9']);
 const baseLanguages = {
   markdown: true
 };
