@@ -1,3 +1,7 @@
+## 1.3.4
+
+* Dependency updates.
+
 ## 1.3.3
 
 * Improve detection of variable-form ligatures.

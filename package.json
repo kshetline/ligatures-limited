@@ -1,6 +1,6 @@
 {
 	"name": "ligatures-limited",
-	"version": "1.3.3",
+	"version": "1.3.4",
 	"publisher": "kshetline",
 	"engines": {
 		"vscode": "^1.44.0"
@@ -202,24 +202,24 @@
 	"markdown": "github",
 	"qna": "marketplace",
 	"dependencies": {
-		"ks-util": "^1.11.0",
+		"ks-util": "^1.11.3",
 		"vscode-oniguruma-wasm": "^1.1.0",
 		"vscode-textmate": "^5.2.0"
 	},
 	"devDependencies": {
-		"@types/chai": "^4.2.11",
+		"@types/chai": "^4.2.12",
 		"@types/chai-spies": "^1.0.1",
 		"@types/glob": "^7.1.3",
-		"@types/lodash": "^4.14.157",
+		"@types/lodash": "^4.14.158",
 		"@types/mocha": "^7.0.2",
-		"@types/node": "^14.0.22",
+		"@types/node": "^14.0.27",
 		"@types/oniguruma": "^7.0.1",
-		"@typescript-eslint/eslint-plugin": "^3.6.0",
-		"@typescript-eslint/parser": "^3.6.0",
+		"@typescript-eslint/eslint-plugin": "^3.8.0",
+		"@typescript-eslint/parser": "^3.8.0",
 		"chai": "^4.2.0",
 		"chai-spies": "^1.0.0",
 		"copyfiles": "^2.3.0",
-		"eslint": "^7.4.0",
+		"eslint": "^7.6.0",
 		"eslint-config-standard": "^14.1.1",
 		"eslint-plugin-chai-friendly": "^0.6.0",
 		"eslint-plugin-import": "^2.22.0",
@@ -228,13 +228,17 @@
 		"eslint-plugin-promise": "^4.2.1",
 		"eslint-plugin-standard": "^4.0.1",
 		"glob": "^7.1.6",
-		"mocha": "^8.0.1",
-		"ts-loader": "^8.0.0",
-		"typescript": "^3.9.6",
+		"minimist": "^1.2.5",
+		"mocha": "^8.1.1",
+		"ts-loader": "^8.0.2",
+		"typescript": "^3.9.7",
 		"vscode": "^1.1.37",
 		"vscode-test": "^1.4.0",
-		"webpack": "^4.43.0",
+		"webpack": "^4.44.1",
 		"webpack-cli": "^3.3.12"
+	},
+	"resolutions": {
+		"minimist": "^1.2.5"
 	},
 	"icon": "img/icon.png",
 	"author": "Kerry Shetline",
@@ -251,6 +255,7 @@
 		"webpack": "env NODE_ENV=production webpack --mode development",
 		"webpack-dev": "webpack --mode development --watch",
 		"compile": "copyfiles -f dev/extension.js dist && tsc -p ./",
+		"preinstall": "bash ./force-resolutions.sh",
 		"postinstall": "node ./node_modules/vscode/bin/install",
 		"test": "node ./out/sample/test/runTest.js",
 		"lint": "eslint \"**/*.ts\""
