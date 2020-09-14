@@ -13,11 +13,13 @@ import { last as _last, processMillis } from 'ks-util';
 import { activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, onChangeDocument, getLanguageIdFromScope, reloadGrammar } from './scope-info/scope-info';
 import { ExtensionContext, Position, Range, TextDocument, TextEditor, window, workspace, Selection, ThemeColor, TextEditorSelectionChangeEvent } from 'vscode';
 
-export const breakNormal = window.createTextEditorDecorationType({ color: '' });
-export const breakDebug = window.createTextEditorDecorationType({ color: 'red', backgroundColor: new ThemeColor('editor.foreground') });
+export const breakNormal0 = window.createTextEditorDecorationType({ fontWeight: '401' });
+export const breakNormal1 = window.createTextEditorDecorationType({ fontWeight: '402' });
+export const breakDebug0 = window.createTextEditorDecorationType({ color: 'red', fontWeight: '401', backgroundColor: new ThemeColor('editor.foreground') });
+export const breakDebug1 = window.createTextEditorDecorationType({ color: 'red', fontWeight: '402', backgroundColor: new ThemeColor('editor.foreground') });
 export const highlightLigature = window.createTextEditorDecorationType({ color: 'green', backgroundColor: new ThemeColor('editor.foreground') });
 export const allLigatures = window.createTextEditorDecorationType({ backgroundColor: '#0000FF18' });
-export const ligatureDecorations = [breakNormal, breakDebug, highlightLigature, allLigatures];
+export const ligatureDecorations = [breakNormal0, breakNormal1, breakDebug0, breakDebug1, highlightLigature, allLigatures];
 
 const OPEN_DOCUMENT_DELAY = 100;
 const MAX_TIME_FOR_PROCESSING_LINES = 100;
@@ -566,10 +568,16 @@ export function activate(context: ExtensionContext): void {
 
         const viewFirst = Math.max(first, Math.min(range.start.line - 1, range.end.line - 1));
         const viewLast = Math.min(last, Math.max(range.start.line + 1, range.end.line + 1));
+        const breaks0 = breaks.filter(r => r.start.character % 2 === 0);
+        const breaks1 = breaks.filter(r => r.start.character % 2 !== 0);
+        const debugBreaks0 = debugBreaks.filter(r => r.start.character % 2 === 0);
+        const debugBreaks1 = debugBreaks.filter(r => r.start.character % 2 !== 0);
 
         processLines(viewFirst, viewLast, false);
-        editor.setDecorations(breakNormal, breaks);
-        editor.setDecorations(breakDebug, debugBreaks);
+        editor.setDecorations(breakNormal0, breaks0);
+        editor.setDecorations(breakNormal1, breaks1);
+        editor.setDecorations(breakDebug0, debugBreaks0);
+        editor.setDecorations(breakDebug1, debugBreaks1);
         editor.setDecorations(highlightLigature, highlights);
         editor.setDecorations(allLigatures, background);
 
@@ -592,8 +600,15 @@ export function activate(context: ExtensionContext): void {
       highlights.sort(sort);
     }
 
-    editor.setDecorations(breakNormal, breaks);
-    editor.setDecorations(breakDebug, debugBreaks);
+    const breaks0 = breaks.filter(r => r.start.character % 2 === 0);
+    const breaks1 = breaks.filter(r => r.start.character % 2 !== 0);
+    const debugBreaks0 = debugBreaks.filter(r => r.start.character % 2 === 0);
+    const debugBreaks1 = debugBreaks.filter(r => r.start.character % 2 !== 0);
+
+    editor.setDecorations(breakNormal0, breaks0);
+    editor.setDecorations(breakNormal1, breaks1);
+    editor.setDecorations(breakDebug0, debugBreaks0);
+    editor.setDecorations(breakDebug1, debugBreaks1);
     editor.setDecorations(highlightLigature, highlights);
     editor.setDecorations(allLigatures, background);
     savedRanges.set(editor, { breaks, debugBreaks, highlights, background });
