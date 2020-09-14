@@ -175,6 +175,8 @@ Markdown has all ligatures enabled, and plain text and various forms of JSON hav
 
 ## Known Issues
 
+* Visual Studio Code 1.49.0 introduced a breaking change for this extension. There is now a work-around, but the work-around causes any suppressed ligature to be rendered in a non-bold font. Typically this won’t be an important issue as most relevant ligatures are seldom used in a bold font context. Hopefully a future release will remove this limitation.
+
 * Occasionally, when working with large files, a console warning `UNRESPONSIVE extension host` may appear, but despite the wording of the message VSCode remains responsive anyway.
 
 ## Credits
