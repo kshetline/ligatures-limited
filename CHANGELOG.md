@@ -1,3 +1,7 @@
+## 1.3.5
+
+* Visual Studio Code 1.49.0 introduced a breaking change for this extension. This version fixes the main problem, but causes any suppressed ligature to be rendered in a non-bold font.
+
 ## 1.3.4
 
 * Dependency updates.
