@@ -10,7 +10,8 @@ import fs from 'fs';
 import * as oniguruma from 'vscode-oniguruma-wasm';
 import { join } from 'path';
 import {
-  Disposable, ExtensionContext, Extension, extensions, Hover, languages, Position, Range, TextDocument, TextDocumentChangeEvent, Uri, workspace
+  Disposable, ExtensionContext, Extension, extensions, Hover, languages, Position, Range, TextDocument,
+  TextDocumentChangeEvent, Uri, workspace
 } from 'vscode';
 import { IGrammar, IRawGrammar, parseRawGrammar, Registry, RegistryOptions } from 'vscode-textmate';
 
@@ -23,8 +24,7 @@ if (!fs.existsSync(onigPath))
   onigPath = join(__dirname, '..', baseOnigPath);
 
 const wasm = fs.readFileSync(onigPath).buffer;
-
-oniguruma.loadWASM(wasm);
+export const wasmReady = oniguruma.loadWASM(wasm);
 
 export let textMateRegistry: Registry;
 

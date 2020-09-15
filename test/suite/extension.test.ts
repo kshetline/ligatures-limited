@@ -3,7 +3,7 @@ import spies from 'chai-spies';
 import { before, it, suite } from 'mocha';
 import path from 'path';
 import { commands, Extension, extensions, Range, TextEditor, TextEditorDecorationType, Uri, window } from 'vscode';
-import { breakDebug0, breakDebug1, breakNormal0, breakNormal1, highlightLigature, allLigatures, ligatureDecorations } from '../../src/extension';
+import { breakNormal, breakDebug, highlightLigature, allLigatures, ligatureDecorations } from '../../src/extension';
 
 chai.use(spies);
 
@@ -26,7 +26,7 @@ async function findEditor(name: string): Promise<TextEditor> {
 }
 
 function isCorrectlyDecorated(map: DecorationMap, line: number, column: number, width: number,
-    decoration: TextEditorDecorationType, decoration2?: TextEditorDecorationType): boolean {
+    decoration: TextEditorDecorationType): boolean {
   const checkRange = new Range(line - 1, column - 1, line - 1, column + width - 1);
 
   if (!decoration) {
@@ -44,18 +44,7 @@ function isCorrectlyDecorated(map: DecorationMap, line: number, column: number, 
     return true;
   }
 
-  let ranges = map.get(decoration.key);
-
-  if (decoration2) {
-    const ranges2 = map.get(decoration2.key);
-
-    if (!ranges)
-      ranges = ranges2;
-    else if (ranges2) {
-      ranges = ranges.slice(0);
-      ranges.push(...ranges2);
-    }
-  }
+  const ranges = map.get(decoration.key);
 
   if (!ranges)
     return false;
@@ -86,7 +75,7 @@ async function getDecorations(fileName: string, clearOnAny = false): Promise<Dec
     expect(decoration).to.be.ok;
 
     if (ligatureDecorations.includes(decoration)) {
-      if (decoration === breakNormal0 || clearOnAny)
+      if (decoration === breakNormal || clearOnAny)
         decorations.clear();
 
       decorations.set(decoration.key, ranges);
@@ -119,22 +108,22 @@ suite('Extension Tests', () => {
     expect(decorations).to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 7, 5, 2, null), 'css /*').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 7, 8, 3, breakNormal0, breakNormal1), 'css ===').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 7, 8, 3, breakNormal), 'css ===').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 7, 12, 3, null), 'css www').to.be.ok;
 
-    expect(isCorrectlyDecorated(decorations, 13, 8, 3, breakNormal0, breakNormal1), 'js www in lc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 13, 12, 2, breakNormal0, breakNormal1), 'js == in lc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 13, 15, 2, breakNormal0, breakNormal1), 'js fi in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 13, 8, 3, breakNormal), 'js www in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 13, 12, 2, breakNormal), 'js == in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 13, 15, 2, breakNormal), 'js fi in lc').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 14, 8, 3, null), 'js www in bc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 14, 12, 2, breakNormal0, breakNormal1), 'js => in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 14, 12, 2, breakNormal), 'js => in bc').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 15, 17, 3, null), 'js ===').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 16, 18, 2, null), 'js =>').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 21, 32, 3, null), 'html www in link').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 21, 54, 3, breakNormal0, breakNormal1), 'html www in text').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 21, 54, 3, breakNormal), 'html www in text').to.be.ok;
   });
 
   it('should find no suppressed ligatures in sample Markdown', async function () {
@@ -155,21 +144,21 @@ suite('Extension Tests', () => {
     const decorations = await getDecorations('sample.ts');
     expect(decorations).to.be.ok;
 
-    expect(isCorrectlyDecorated(decorations, 1, 4, 3, breakDebug0, breakDebug1), 'ts www in lc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 1, 8, 3, breakDebug0, breakDebug1), 'ts !== in lc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 1, 12, 2, breakDebug0, breakDebug1), 'ts <= in lc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 1, 15, 3, breakDebug0, breakDebug1), 'ts 0xA in lc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 1, 19, 3, breakDebug0, breakDebug1), 'ts 2x3 in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 4, 3, breakDebug), 'ts www in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 8, 3, breakDebug), 'ts !== in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 12, 2, breakDebug), 'ts <= in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 15, 3, breakDebug), 'ts 0xA in lc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 1, 19, 3, breakDebug), 'ts 2x3 in lc').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 2, 4, 3, highlightLigature), 'ts www in bc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 2, 8, 3, breakDebug0, breakDebug1), 'ts !== in bc').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 2, 12, 2, breakDebug0, breakDebug1), 'ts >= in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 2, 8, 3, breakDebug), 'ts !== in bc').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 2, 12, 2, breakDebug), 'ts >= in bc').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 2, 15, 3, highlightLigature), 'ts 0xA in bc').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 2, 19, 3, highlightLigature), 'ts 2x3 in bc').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 9, 9, 2, highlightLigature), 'ts <=').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 9, 19, 2, highlightLigature), 'ts >=').to.be.ok;
-    expect(isCorrectlyDecorated(decorations, 9, 29, 2, breakDebug0, breakDebug1), 'ts !=').to.be.ok;
+    expect(isCorrectlyDecorated(decorations, 9, 29, 2, breakDebug), 'ts !=').to.be.ok;
 
     expect(isCorrectlyDecorated(decorations, 10, 19, 2, highlightLigature), 'ts =>').to.be.ok;
 
@@ -196,10 +185,8 @@ suite('Extension Tests', () => {
     this.timeout(3000);
     const decorations = await getDecorations('sample.c', true);
     expect(decorations).to.be.ok;
-    expect(decorations.get(breakNormal0.key)?.length ?? 0).to.equal(0);
-    expect(decorations.get(breakNormal1.key)?.length ?? 0).to.equal(0);
-    expect(decorations.get(breakDebug0.key)?.length ?? 0).to.equal(0);
-    expect(decorations.get(breakDebug1.key)?.length ?? 0).to.equal(0);
+    expect(decorations.get(breakNormal.key)?.length ?? 0).to.equal(0);
+    expect(decorations.get(breakDebug.key)?.length ?? 0).to.equal(0);
     expect(decorations.get(highlightLigature.key)?.length ?? 0).to.equal(0);
     expect(decorations.get(allLigatures.key).length).to.equal(0);
   });

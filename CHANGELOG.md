@@ -1,3 +1,8 @@
+## 1.4.0
+
+* A new version of the previous fix for Visual Studio Code 1.49.0, with no bold font limitation.
+* Ability to suppress a ligature of four or more dashes, by themselves without a leading `<` or trailing `>`.
+
 ## 1.3.5
 
 * Visual Studio Code 1.49.0 introduced a breaking change for this extension. This version fixes the main problem, but causes any suppressed ligature to be rendered in a non-bold font.
