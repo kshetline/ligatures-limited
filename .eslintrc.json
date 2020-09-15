@@ -48,12 +48,15 @@
       2,
       {
         "ArrayExpression": "first",
+        "FunctionDeclaration": {
+          "parameters": "off"
+        },
         "ignoredNodes": [
+          "CallExpression > :expression *",
           "IfStatement > :expression *",
-          "WhileStatement > :expression *",
-          "FunctionDeclaration > AssignmentPattern",
-          "FunctionDeclaration > Identifier"
+          "WhileStatement > :expression *"
         ],
+        "ignoreComments": true,
         "ObjectExpression": "first",
         "SwitchCase": 1
       }
@@ -72,6 +75,13 @@
         "ignoreRestSiblings": false
       }
     ],
+    "object-curly-newline": [
+      "error",
+      {
+        "consistent": true
+      }
+    ],
+    "object-property-newline": "off",
     "operator-linebreak": "off",
     "semi": [
       "error",

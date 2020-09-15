@@ -8,6 +8,12 @@
         "settings": {
           "foreground": "#D4D4D4"
         }
+      },
+      {
+        "scope": "comment",
+        "settings": {
+          "fontStyle": "bold"
+        }
       }
     ]
   },
