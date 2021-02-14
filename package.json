@@ -1,6 +1,6 @@
 {
 	"name": "ligatures-limited",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"publisher": "kshetline",
 	"engines": {
 		"vscode": "^1.44.0"
@@ -255,9 +255,13 @@
 		"webpack": "env NODE_ENV=production webpack --mode development",
 		"webpack-dev": "webpack --mode development --watch",
 		"compile": "copyfiles -f dev/extension.js dist && tsc -p ./",
-		"preinstall": "bash ./force-resolutions.sh",
+		"preinstall": "npm i --package-lock-only --ignore-scripts --no-audit && npx npm-force-resolutions",
 		"postinstall": "node ./node_modules/vscode/bin/install",
 		"test": "node ./out/sample/test/runTest.js",
 		"lint": "eslint \"**/*.ts\""
-	}
+	},
+	"extensionKind": [
+		"ui",
+		"workspace"
+	]
 }

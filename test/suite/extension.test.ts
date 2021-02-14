@@ -11,7 +11,7 @@ type DecorationMap = Map<string, Range[]>;
 
 async function findEditor(name: string): Promise<TextEditor> {
   for (let i = 0; i < 5; ++i) {
-    await new Promise(resolve => setTimeout(() => resolve(), 50));
+    await new Promise<void>(resolve => setTimeout(() => resolve(), 50));
     const editors = Array.from(window.visibleTextEditors);
 
     for (const editor of editors) {
@@ -171,13 +171,14 @@ suite('Extension Tests', () => {
     expect(isCorrectlyDecorated(decorations, 13, 27, 3, highlightLigature), 'ts =>').to.not.be.ok;
   });
 
-  it('should find extended mixed ligatures and prioritize the |> part of =|>', async function () {
+  it('should find extended mixed ligatures and prioritize the |> part of =|>', async function (done) {
     this.slow(150);
     this.timeout(3000);
     const decorations = await getDecorations('sample.md');
     expect(decorations).to.be.ok;
     expect(isCorrectlyDecorated(decorations, 3, 67, 11, highlightLigature), 'md >>--|--||->').to.be.ok;
     expect(isCorrectlyDecorated(decorations, 3, 80, 2, highlightLigature), 'md |>').to.be.ok;
+    done();
   });
 
   it('should find no ligatures in C document with ligatures disabled by VSCode', async function () {

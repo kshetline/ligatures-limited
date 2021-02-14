@@ -1,5 +1,6 @@
 // The technique used in the code below for suppressing the rendering of ligatures
-// was derived from https://github.com/CoenraadS/vscode-Disable-Ligatures.
+// was originally derived from https://github.com/CoenraadS/vscode-Disable-Ligatures,
+// then modified later for changes in VSCode.
 //
 // This extension also replicates (and expands) the functionality provided by
 // vscode-Disable-Ligatures.
