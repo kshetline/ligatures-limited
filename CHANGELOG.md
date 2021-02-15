@@ -1,3 +1,7 @@
+## 1.4.1
+
+* Updated to work for remote SSL and WSL sessions.
+
 ## 1.4.0
 
 * A new version of the previous fix for Visual Studio Code 1.49.0, with no bold font limitation.
