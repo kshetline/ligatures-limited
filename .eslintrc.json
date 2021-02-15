@@ -61,6 +61,7 @@
         "SwitchCase": 1
       }
     ],
+    "multiline-ternary": "off",
     "no-control-regex": "off",
     "no-new": "off",
     "no-return-assign": "off",

@@ -1,5 +1,6 @@
 // The technique used in the code below for suppressing the rendering of ligatures
-// was derived from https://github.com/CoenraadS/vscode-Disable-Ligatures.
+// was originally derived from https://github.com/CoenraadS/vscode-Disable-Ligatures,
+// then modified later for changes in VSCode.
 //
 // This extension also replicates (and expands) the functionality provided by
 // vscode-Disable-Ligatures.
@@ -9,7 +10,7 @@ import {
   readConfiguration, resetConfiguration, SelectionMode
 } from './configuration';
 import { registerCommand, showInfoMessage } from './extension-util';
-import { last as _last, processMillis } from 'ks-util';
+import { last as _last, processMillis } from '@tubular/util';
 import {
   activate as scopeInfoActivate, deactivate as scopeInfoDeactivate, onChangeDocument, getLanguageIdFromScope,
   reloadGrammar, wasmReady

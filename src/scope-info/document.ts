@@ -1,4 +1,4 @@
-import { last } from 'ks-util';
+import { last } from '@tubular/util';
 import * as textUtil from './text-util';
 import {
   Position, Range, TextDocument, TextDocumentChangeEvent, TextDocumentContentChangeEvent, TextLine, window
